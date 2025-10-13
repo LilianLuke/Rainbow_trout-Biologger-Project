@@ -32,7 +32,7 @@ library(performance)
 
 Full_Data_Clean <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/ThermoEvo - General/Lilian data/R outputs/Biologgers data/Biologger Clean data.xlsx") 
 
-
+### Convert covariates to factor with n levels
 Full_Data_Out <- Full_Data_Clean %>%
   mutate(
     greb1l = as.factor(greb1l),
@@ -48,13 +48,12 @@ Full_Data_Out <- Full_Data_Clean %>%
     Time = hms(Time),
   )%>%
   filter (
-    !AvgEA == MaxEA
+    !AvgEA == MaxEA ### Removes all the data point with 2spm (we only use those with 60spm)
   )
 
 
 
-
-## make sure factors are read correctly
+### make sure all covariates are considered correctly
 str(Full_Data_Out$Biologger)
 str(Full_Data_Out$fam)
 str(Full_Data_Out$greb1l)
@@ -66,9 +65,7 @@ str(Full_Data_Out$DateTime)
 
 
 
-
-
-##Create a log column for each act parameter to be able to run GAMMS on it
+### Create a log column for each ACT parameter to be able to run GAMMS on it
 Full_Data_Out <- Full_Data_Out %>%
   group_by(Biologger) %>%
   mutate(
@@ -78,7 +75,109 @@ Full_Data_Out <- Full_Data_Out %>%
   )
 
 
-##Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
+### Test the k-means clustering to estimate the VAR threshold
+
+  # Initialize total within sum of squares error: wss
+  wss <- 0
+
+  # For 1 to 5 cluster centers
+  for (i in 1:10) {
+    km.out <- kmeans(Full_Data_Out$VAR, centers = i, nstart = 100)
+    # Save total within sum of squares to wss variable
+    wss[i] <- km.out$tot.withinss
+  }
+
+  # Plot total within sum of squares vs. number of clusters
+  plot(1:10, wss, type = "b", 
+       xlab = "Number of Clusters", 
+       ylab = "Within groups sum of squares")
+  
+  
+  
+km.out <- kmeans(Full_Data_Out$VAR, centers = 2, nstart = 20)
+
+summary(km.out)
+
+plot(Full_Data_Out$VAR, 
+     col = km.out$cluster,
+     main = "k-means with 2 clusters",
+     xlab = "",
+     ylab = "")
+
+km.out <- kmeans(Full_Data_Out$VAR, centers = 3, nstart = 20)
+
+summary(km.out)
+
+plot(Full_Data_Out$VAR, 
+     col = km.out$cluster,
+     main = "k-means with 3 clusters",
+     xlab = "",
+     ylab = "")
+
+
+km.out <- kmeans(Full_Data_Out$VAR, centers = 5, nstart = 20)
+
+summary(km.out)
+
+
+Full_Data_Out$Cluster <- factor(km.out$cluster)
+Full_Data_Out$Index <- seq_along(Full_Data_Out$VAR)
+
+
+ggplot(Full_Data_Out, aes(x = Index, y = VAR, color = Cluster)) +
+  geom_point() +
+  labs(
+    title = "k-means with 3 clusters",
+    x = "",
+    y = ""
+  ) +
+  theme_minimal()+
+  geom_hline(yintercept = 17000, color = "red", linetype = "dashed", linewidth=1)
+
+
+
+
+ggplot(Full_Data_Out, aes(x = VAR)) +
+  geom_density(fill = "lightblue") +
+  labs(title = "Density of Acceleration Variance", x = "VAR", y = "Density")
+
+
+
+
+
+
+### Try with hierarchical clustering
+
+hclust.out <- hclust(dist(Full_Data_Out$VAR)) #=> Error: cannot allocate vector of size 57.2 Gb
+
+# Inspect the result
+summary(hclust.out)
+
+
+
+### Try with gaussian mixture model
+gmm <- Mclust(Full_Data_Out$VAR, G = 2)
+
+# Add cluster assignment
+Full_Data_Out$Cluster <- as.factor(gmm$classification)
+
+# Plot
+ggplot(Full_Data_Out, aes(x = seq_along(VAR), y = VAR, color = Cluster)) +
+  geom_point() +
+  labs(title = "Gaussian Mixture Model: 2 Clusters", x = "", y = "Variance of Acceleration") +
+  theme_minimal()
+
+summary(gmm)
+
+
+model <- brm(bf(VAR ~ 1, family = mixture(gaussian(), Gamma())),
+             data = Full_Data_Out, chains = 4, iter = 2000)
+
+summary(model)
+plot(model)
+
+
+### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
     BurstScore = as.numeric(if_else(
@@ -310,9 +409,6 @@ qqPlot(resid(CountBurstMod))
 performance(CountBurstMod)
 summary(CountBurstMod)
 
-hist(resid(CountBurstMod))
-qqPlot(resid(CountBurstMod))
-summary(CountBurstMod)
 
 EMM <- emmeans(CountBurstMod, ~greb1l:food:Tempgroup, data=TempBurst) 
 EMM_resp <- regrid(EMM)
@@ -447,7 +543,7 @@ summary(ACTmodelVAR_F)
 
 
 
-ACTmodelAvg_B <- glmmTMB(AvgEA~ TimeToNoon+Tempgroup*food*greb1l + (1 |Biologger ),
+ACTmodelAvg_B <- glmmTMB(AvgEA~ TimeToNoon*Tempgroup*food*greb1l + (1 |Biologger ),
                          family = Gamma("log"), 
                          data = BaselineData)
 
