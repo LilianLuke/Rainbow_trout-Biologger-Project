@@ -81,18 +81,18 @@ Full_Data_Out <- Full_Data_Out %>%
   wss <- 0
 
   # For 1 to 5 cluster centers
-  for (i in 1:10) {
+  for (i in 1:15) {
     km.out <- kmeans(Full_Data_Out$VAR, centers = i, nstart = 100)
     # Save total within sum of squares to wss variable
     wss[i] <- km.out$tot.withinss
   }
 
   # Plot total within sum of squares vs. number of clusters
-  plot(1:10, wss, type = "b", 
+  plot(1:15, wss, type = "b", 
        xlab = "Number of Clusters", 
        ylab = "Within groups sum of squares")
   
-  
+  #Could be 2 or 3 culsters
   
 km.out <- kmeans(Full_Data_Out$VAR, centers = 2, nstart = 20)
 
@@ -120,63 +120,39 @@ km.out <- kmeans(Full_Data_Out$VAR, centers = 5, nstart = 20)
 summary(km.out)
 
 
-Full_Data_Out$Cluster <- factor(km.out$cluster)
-Full_Data_Out$Index <- seq_along(Full_Data_Out$VAR)
-
-
-ggplot(Full_Data_Out, aes(x = Index, y = VAR, color = Cluster)) +
-  geom_point() +
-  labs(
-    title = "k-means with 3 clusters",
-    x = "",
-    y = ""
-  ) +
-  theme_minimal()+
-  geom_hline(yintercept = 17000, color = "red", linetype = "dashed", linewidth=1)
-
-
-
-
-ggplot(Full_Data_Out, aes(x = VAR)) +
-  geom_density(fill = "lightblue") +
-  labs(title = "Density of Acceleration Variance", x = "VAR", y = "Density")
-
-
-
-
-
-
 ### Try with hierarchical clustering
 
 hclust.out <- hclust(dist(Full_Data_Out$VAR)) #=> Error: cannot allocate vector of size 57.2 Gb
 
-# Inspect the result
-summary(hclust.out)
-
-
 
 ### Try with gaussian mixture model
-gmm <- Mclust(Full_Data_Out$VAR, G = 2)
+gmm <- Mclust(Full_Data_Out$VAR, G = 3)
 
-# Add cluster assignment
+  # Add cluster assignment
 Full_Data_Out$Cluster <- as.factor(gmm$classification)
 
-# Plot
-ggplot(Full_Data_Out, aes(x = seq_along(VAR), y = VAR, color = Cluster)) +
-  geom_point() +
-  labs(title = "Gaussian Mixture Model: 2 Clusters", x = "", y = "Variance of Acceleration") +
-  theme_minimal()
+Full_Data_OutTEST <- Full_Data_Out %>%
+  mutate(
+    DateTime = as.character(DateTime)
+  )
+  # Plot
+ggplot(Full_Data_OutTEST, aes(x = DateTime, y = VAR, col=Cluster)) +
+  geom_point(alpha=0.05) +
+  labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
+  theme_minimal()+
+  ylim(0,200)
 
 summary(gmm)
 
 
-model <- brm(bf(VAR ~ 1, family = mixture(gaussian(), Gamma())),
-             data = Full_Data_Out, chains = 4, iter = 2000)
 
-summary(model)
-plot(model)
+model2 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 2, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma")))
 
+model3 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 3, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma"), FLXMCdist1(VAR ~ ., dist = "gamma")))
 
+summary(model2)
+
+summary(model3)
 ### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
