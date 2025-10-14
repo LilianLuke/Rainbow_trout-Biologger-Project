@@ -29,8 +29,12 @@ library(ggeffects)
 library(DHARMa)
 library(glmmTMB)
 library(performance)
+library(flexmix)
+library(mclust)
 
-Full_Data_Clean <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/ThermoEvo - General/Lilian data/R outputs/Biologgers data/Biologger Clean data.xlsx") 
+
+Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger Clean data.xlsx"))
+
 
 ### Convert covariates to factor with n levels
 Full_Data_Out <- Full_Data_Clean %>%
@@ -74,15 +78,49 @@ Full_Data_Out <- Full_Data_Out %>%
     LogVAR = as.numeric(log10(VAR+0.76)),
   )
 
+### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
+Full_Data_Out <- Full_Data_Out %>%
+  mutate(
+    BurstScore = as.numeric(if_else(
+      VAR < 220,
+      0,
+      1,
+    )),
+    ##Add a SwimStyle column to be able to split data based on bursting
+    Swimstyle = as.factor(if_else(
+      VAR < 220,
+      "Steady",
+      "Burst",
+    )),
+    ## Add a Tempgroup column to be able to split data based on the temp threshold identified when looking at VAR/Temp
+    Tempgroup = as.factor(if_else(
+      Temp < 4.5,
+      "LowTemp",
+      "HighTemp"
+    )),
+  ) %>%
+  filter(
+    Biologger != "UXL0471DAT"
+  )
+
+str(Full_Data_Out$BurstScore)
+str(Full_Data_Out$Swimstyle)
+str(Full_Data_Out$Tempgroup)
+
+### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
+Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
+Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
+
+
 
 ### Test the k-means clustering to estimate the VAR threshold
 
   # Initialize total within sum of squares error: wss
   wss <- 0
 
-  # For 1 to 5 cluster centers
+  # For 1 to 15 cluster centers
   for (i in 1:15) {
-    km.out <- kmeans(Full_Data_Out$VAR, centers = i, nstart = 100)
+    km.out <- kmeans(Full_Data_Out$VAR, centers = i, nstart = 10, iter.max = 100)
     # Save total within sum of squares to wss variable
     wss[i] <- km.out$tot.withinss
   }
@@ -140,7 +178,7 @@ ggplot(Full_Data_OutTEST, aes(x = DateTime, y = VAR, col=Cluster)) +
   geom_point(alpha=0.05) +
   labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
   theme_minimal()+
-  ylim(0,200)
+  ylim(0,50)
 
 summary(gmm)
 
@@ -148,44 +186,14 @@ summary(gmm)
 
 model2 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 2, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma")))
 
-model3 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 3, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma"), FLXMCdist1(VAR ~ ., dist = "gamma")))
+model3 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 5, model = FLXMCdist1(VAR ~ ., dist = "gamma"))
 
 summary(model2)
 
 summary(model3)
-### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
-Full_Data_Out <- Full_Data_Out %>%
-  mutate(
-    BurstScore = as.numeric(if_else(
-      VAR < 220,
-      0,
-      1,
-    )),
-    ##Add a SwimStyle column to be able to split data based on bursting
-    Swimstyle = as.factor(if_else(
-      VAR < 220,
-      "Steady",
-      "Burst",
-    )),
-    ## Add a Tempgroup column to be able to split data based on the temp threshold identified when looking at VAR/Temp
-    Tempgroup = as.factor(if_else(
-      Temp < 4.5,
-      "LowTemp",
-      "HighTemp"
-    )),
-  ) %>%
-  filter(
-    Biologger != "UXL0471DAT"
-  )
 
-str(Full_Data_Out$BurstScore)
-str(Full_Data_Out$Swimstyle)
-str(Full_Data_Out$Tempgroup)
-
-### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
-Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
-Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
-
+summary(model5)
+### test number and % of 0s
 colSums(Full_Data_Out[, "BurstScore"] == 0)                  #' Number of zeros
 100 * colSums(Full_Data_Out[, "BurstScore"] == 0) / nrow(Full_Data_Out) #' % of zeros
 
