@@ -1,6 +1,6 @@
 *.Rproj
 path-file-jenni.R
-path-file-lilian.R
+path_file_lilian.R
 path-file-lucy.R
 
 # History files
