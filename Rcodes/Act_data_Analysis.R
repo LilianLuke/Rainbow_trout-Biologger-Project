@@ -32,7 +32,8 @@ library(performance)
 library(flexmix)
 library(mclust)
 
-
+source("path_file_lilian.R")
+  
 Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger Clean data.xlsx"))
 
 
@@ -98,9 +99,11 @@ Full_Data_Out <- Full_Data_Out %>%
       "LowTemp",
       "HighTemp"
     )),
+    corr.VAR = as.numeric(VAR-(MaxEA-AvgEA)^2/60),
+    corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
   ) %>%
   filter(
-    Biologger != "UXL0471DAT"
+    Biologger != "UXL0471DAT",
   )
 
 str(Full_Data_Out$BurstScore)
@@ -112,15 +115,44 @@ Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Sprin
 Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
 
 
+ggplot(Full_Data_Out, aes(x = greb1l, y = MaxEA)) +
+  facet_wrap(~food+Tempgroup)+
+  geom_boxplot(aes(fill=greb1l)) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Variance of Acceleration") +
+  theme_minimal()
+
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA)) +
+  geom_point(alpha=0.5) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
+  theme_minimal()
+
+ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
+  geom_point(alpha=0.01) +
+  labs(title = "What do we use to determine swimming type ?", x = "Average Acceleration", y = "Variance of Acceleration") +
+  theme_minimal()
+
 
 ### Test the k-means clustering to estimate the VAR threshold
+  # Prep dataset for clustering (remove NAs and "factor" covariate)
+  Full_Data_Out_Cluster <- Full_Data_Out %>%
+    ungroup()%>%
+    select(
+      VAR, MaxEA, AvgEA, 
+    )
 
+  anyNA(Full_Data_Out_Cluster)
+  any(is.nan(as.matrix(Full_Data_Out_Cluster)))
+  any(is.infinite(as.matrix(Full_Data_Out_Cluster)))
+  
+  str(Full_Data_Out_Cluster$AvgEA)
+  str(Full_Data_Out_Cluster$VAR)
+  str(Full_Data_Out_Cluster$MaxEA)
   # Initialize total within sum of squares error: wss
   wss <- 0
 
   # For 1 to 15 cluster centers
   for (i in 1:15) {
-    km.out <- kmeans(Full_Data_Out$VAR, centers = i, nstart = 10, iter.max = 100)
+    km.out <- kmeans(Full_Data_Out_Cluster, centers = i, nstart = 10, iter.max = 100)
     # Save total within sum of squares to wss variable
     wss[i] <- km.out$tot.withinss
   }
@@ -142,11 +174,15 @@ plot(Full_Data_Out$VAR,
      xlab = "",
      ylab = "")
 
-km.out <- kmeans(Full_Data_Out$VAR, centers = 3, nstart = 20)
+
+
+
+
+km.out <- kmeans(Full_Data_Out_Cluster, centers = 3, nstart = 20)
 
 summary(km.out)
 
-plot(Full_Data_Out$VAR, 
+plot(Full_Data_Out[, c("MaxEA", "AvgEA")], 
      col = km.out$cluster,
      main = "k-means with 3 clusters",
      xlab = "",
@@ -164,35 +200,47 @@ hclust.out <- hclust(dist(Full_Data_Out$VAR)) #=> Error: cannot allocate vector 
 
 
 ### Try with gaussian mixture model
-gmm <- Mclust(Full_Data_Out$VAR, G = 3)
+gmm <- Mclust(Full_Data_Out_Cluster, G = 3)
 
   # Add cluster assignment
+Full_Data_Out_Cluster$Cluster <- as.factor(gmm$classification)
 Full_Data_Out$Cluster <- as.factor(gmm$classification)
 
-Full_Data_OutTEST <- Full_Data_Out %>%
-  mutate(
-    DateTime = as.character(DateTime)
-  )
+
+#Full_Data_Out_Cluster <- Full_Data_Out %>%
+ # mutate(
+  #  DateTime = as.character(DateTime)
+ # )
   # Plot
-ggplot(Full_Data_OutTEST, aes(x = DateTime, y = VAR, col=Cluster)) +
-  geom_point(alpha=0.05) +
+ggplot(Full_Data_Out_Cluster, aes(x = MaxEA, y = VAR, col=Cluster)) +
+  geom_point(alpha=0.2) +
   labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
   theme_minimal()+
-  ylim(0,50)
+  xlim(0,100)+
+  ylim(0,200)
 
 summary(gmm)
 
+ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.VAR)) +
+  geom_point(alpha=0.2) +
+  labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
+  theme_minimal()+
+  xlim(0,1500)
 
 
-model2 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 2, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma")))
+model2 <- flexmix(VAR ~ 1 | Biologger, data = Full_Data_OutTEST, k = 2, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma")))
 
-model3 <- flexmix(VAR ~ DateTime, data = Full_Data_OutTEST, k = 5, model = FLXMCdist1(VAR ~ ., dist = "gamma"))
+model3 <- flexmix(VAR ~ MaxEA | Biologger, data = Full_Data_Out, k = 3, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma"), FLXMCdist1(VAR ~ ., dist = "gamma")))
 
 summary(model2)
 
 summary(model3)
+plot(model3)
 
 summary(model5)
+
+
+
 ### test number and % of 0s
 colSums(Full_Data_Out[, "BurstScore"] == 0)                  #' Number of zeros
 100 * colSums(Full_Data_Out[, "BurstScore"] == 0) / nrow(Full_Data_Out) #' % of zeros
@@ -365,11 +413,15 @@ FilteredData <- Full_Data_Out%>%
 ### TO analyse burst data, use the count data (BurstScore)
 ### Create a dataset with burst frequency within temperature groups 
 ### (cannot use count because there are more measurements in lowtemp group, but because BurstScore is either 0 or 1, mean = frequency and is independant of the number of measurements)
-TempBurst <- Full_Data_Out%>%  
-  group_by(Tempgroup, Biologger) %>%
+Full_Data_perday <- Full_Data_Out%>%  
+  group_by(Date, Biologger) %>%
   summarise(
     mean_BurstScore = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
-    logBurstProp = as.numeric(log(mean_BurstScore)),
+    mean_AvgEA = as.numeric(mean(AvgEA, na.rm = TRUE)),
+    mean_MaxEA = as.numeric(mean(MaxEA, na.rm = TRUE)),
+    mean_VAR = as.numeric(mean(VAR, na.rm = TRUE)),
+    mean_cAvgEA = as.numeric(mean(corr.AvgEA, na.rm = TRUE)),
+    mean_cVAR = as.numeric(mean(corr.VAR, na.rm = TRUE)),
     Month = first(Month),
     Biologger = first(Biologger),
     greb1l = first(greb1l),
@@ -378,10 +430,21 @@ TempBurst <- Full_Data_Out%>%
     tank = first(tank),
     Season = first(Season),
     LengthFeb = first(LengthFeb),
-    WeightFeb = first(WeightFeb)
+    WeightFeb = first(WeightFeb),
+    Tempgroup = first(Tempgroup),
   )
 
-str(TempBurst$Biologger)
+str(Full_Data_perday$Biologger)
+
+ggplot(Full_Data_perday, aes(x = Date, y = mean_cVAR, col=greb1l)) +
+  facet_wrap(~food+Tempgroup)+
+  geom_point(alpha=0.2) +
+  labs(title = "WTF is going on?", x = "MaxEA", y = "(Variance corrected for MaxEA)") +
+  theme_minimal()
+
+
+
+
 
 
 CountBurstMod <- glmmTMB(mean_BurstScore ~ (Tempgroup+greb1l)*food + (1 |tank )+ (1 |fam ), ##best model

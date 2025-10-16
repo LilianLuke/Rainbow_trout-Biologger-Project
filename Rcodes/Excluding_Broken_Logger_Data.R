@@ -30,7 +30,7 @@ library(tools)
 library(ggeffects)
 
 
-Full_Data <- read_xlsx("C:/Users/03278487/OneDrive - Valtion/General - ThermoEvo/Lilian data/R outputs/Biologgers data/Biologger full data.xlsx")
+Full_Data <- read_xlsx(paste0(path.data, "Biologger full data.xlsx"))
 
 ##Find the correct date to split data in 2 seasons
 
@@ -77,7 +77,7 @@ Full_Data_Clean <- Full_Data %>%
     Biologger != "UXL0532DAT",
     Biologger != "UXL0533DAT",
     Biologger != "UXL0511DAT",
-    !(Skew == 0 & Kurt == -2),
+    !(Skew < 2 & Kurt < 0),
     !VAR == 0,
     )
 
