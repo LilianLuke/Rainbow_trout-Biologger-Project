@@ -77,8 +77,8 @@ Full_Data_Clean <- Full_Data %>%
     Biologger != "UXL0532DAT",
     Biologger != "UXL0533DAT",
     Biologger != "UXL0511DAT",
-    !(Skew < 2 & Kurt < 0),
-    !VAR == 0,
+    !(Skew == 0 & Kurt == -2),
+    !(Skew == 0 & Kurt == 0),
     )
 
 Full_Data_Clean %>%

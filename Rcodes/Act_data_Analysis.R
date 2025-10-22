@@ -89,7 +89,7 @@ Full_Data_Out <- Full_Data_Out %>%
     )),
     ##Add a SwimStyle column to be able to split data based on bursting
     Swimstyle = as.factor(if_else(
-      VAR < 220,
+      AvgEA < (MaxEA/60)+10,
       "Steady",
       "Burst",
     )),
@@ -99,8 +99,9 @@ Full_Data_Out <- Full_Data_Out %>%
       "LowTemp",
       "HighTemp"
     )),
-    corr.VAR = as.numeric(VAR-(MaxEA-AvgEA)^2/60),
     corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
+    corr.VAR = as.numeric(VAR-(MaxEA-(MaxEA/60))^2/60),
+    th.VAR = as.numeric(((MaxEA-(10))^2+59*(0-(10))^2)/60),
   ) %>%
   filter(
     Biologger != "UXL0471DAT",
@@ -115,21 +116,103 @@ Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Sprin
 Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
 
 
-ggplot(Full_Data_Out, aes(x = greb1l, y = MaxEA)) +
-  facet_wrap(~food+Tempgroup)+
-  geom_boxplot(aes(fill=greb1l)) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Variance of Acceleration") +
-  theme_minimal()
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA)) +
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=Swimstyle)) +
   geom_point(alpha=0.5) +
   labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
-  theme_minimal()
+  #geom_line(aes(x= MaxEA, y= MaxEA/60, col="red"), linewidth=1)+
+  geom_abline(intercept = 0, slope = 1/60, color="red")+
+  geom_abline(intercept = 0, slope = 2/60, color="red")+
+  geom_abline(intercept = 10, slope =  1/60, color="blue")+
+  geom_vline(xintercept = 600, color="green")
 
-ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
-  geom_point(alpha=0.01) +
-  labs(title = "What do we use to determine swimming type ?", x = "Average Acceleration", y = "Variance of Acceleration") +
-  theme_minimal()
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA-MaxEA/60)) +
+  geom_point(alpha=0.1) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration") +
+  geom_abline(intercept = 0, slope = 0, color="red")+
+  geom_abline(intercept = 10, slope = 0, color="blue")
+
+
+ggplot(Full_Data_Out, aes(x = MaxEA, y = VAR, col=Swimstyle)) +
+  geom_point(alpha=0.1) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration")+
+  geom_line(aes(x= MaxEA, y= th.VAR), color="red", linewidth=1)
+  
+  
+  
+Threshold_Data <- Full_Data_Out %>%
+  filter(
+    VAR < 221 & VAR > 220
+  )
+
+mean(Threshold_Data$AvgEA)
+
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=LengthFeb)) +
+  geom_point(alpha=0.1) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
+  geom_abline(intercept = 0, slope = 1/60, color="red")+
+  geom_abline(intercept = 0, slope = 1, color="red")+
+  xlim(0,100)+
+  ylim(0,50)
+  #geom_abline(intercept = 10, slope =  1/60, color="blue")
+
+
+ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.VAR)) +
+  geom_point(alpha=0.1) +
+  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") 
+#geom_abline(intercept = 10, slope =  1/60, color="blue")
+
+library(plotly)
+plot_ly(data = Full_Data_Out, x = ~VAR, y = ~MaxEA, z = ~AvgEA, type = "scatter3d", size = 1, mode = "markers")
+
+Clust <- Full_Data_Out[, c(6, 33, 34)]
+
+Clust_scaled<- scale(Clust[, c("VAR", "AvgEA", "MaxEA")])
+
+Clust_log <- log1p(Clust)
+# Initialize total within sum of squares error: wss
+wss <- 0
+
+# For 1 to 15 cluster centers
+for (i in 1:15) {
+  km.out <- kmeans(clusterScale, centers = i, nstart = 10, iter.max = 100)
+  # Save total within sum of squares to wss variable
+  wss[i] <- km.out$tot.withinss
+}
+
+# Plot total within sum of squares vs. number of clusters
+plot(1:15, wss, type = "b", 
+     xlab = "Number of Clusters", 
+     ylab = "Within groups sum of squares")
+
+
+km.out <- kmeans(clusterScale, centers = 3, nstart = 10)
+
+summary(km.out)
+clusterScale$Cluster <- as.factor(km.out$cluster)
+
+plot_ly(data = Clust, x = ~VAR, y = ~MaxEA, z = ~AvgEA, type = "scatter3d", color=Clust$cluster, size = 1, mode = "markers")
+
+
+
+### Try with gaussian mixture model
+gmm <- Mclust(Clust_scaled, G = 3)
+
+
+Clust$cluster <- gmm$classification
+
+
+# Add cluster assignment
+Full_Data_Out_Cluster$Cluster <- as.factor(gmm$classification)
+Full_Data_Out$Cluster <- as.factor(gmm$classification)
+
+
+
+
+
+
+
+
+
 
 
 ### Test the k-means clustering to estimate the VAR threshold
@@ -139,6 +222,7 @@ ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
     select(
       VAR, MaxEA, AvgEA, 
     )
+  Full_Data_Out_Cluster_scaled <- scale(Full_Data_Out_Cluster[, c("VAR", "AvgEA", "MaxEA")])
 
   anyNA(Full_Data_Out_Cluster)
   any(is.nan(as.matrix(Full_Data_Out_Cluster)))
@@ -152,7 +236,7 @@ ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
 
   # For 1 to 15 cluster centers
   for (i in 1:15) {
-    km.out <- kmeans(Full_Data_Out_Cluster, centers = i, nstart = 10, iter.max = 100)
+    km.out <- kmeans(Full_Data_Out_Cluster_scaled, centers = i, nstart = 10, iter.max = 100)
     # Save total within sum of squares to wss variable
     wss[i] <- km.out$tot.withinss
   }

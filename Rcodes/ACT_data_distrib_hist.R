@@ -86,4 +86,21 @@ for (id in loggernb) {
   dev.off()
 }
 
+hist(Full_Data_Out$`MaxEA`,
+     main = paste("MaxEA distribution"),
+     xlab = "MaxEA",
+     breaks = 50,
+     xlim = c(0,3000),
+     ylim = c(0, 5000)
+       
+)
+
+hist(Full_Data_Out$`AvgEA`,
+     main = paste("AvgEA distribution"),
+     xlab = "AvgEA",
+     breaks = 125,
+     xlim = c(12,100),
+     ylim = c(0, 200)
+     
+)
 
