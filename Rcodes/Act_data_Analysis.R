@@ -53,7 +53,7 @@ Full_Data_Out <- Full_Data_Clean %>%
     Time = hms(Time),
   )%>%
   filter (
-    !AvgEA == MaxEA ### Removes all the data point with 2spm (we only use those with 60spm)
+    !AvgEA == MaxEA, ### Removes all the data point with 2spm (we only use those with 60spm)
   )
 
 
@@ -82,16 +82,16 @@ Full_Data_Out <- Full_Data_Out %>%
 ### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
-    BurstScore = as.numeric(if_else(
-      VAR < 220,
+    BurstScore = as.factor(if_else(
+      VAR < 89,
       0,
       1,
     )),
     ##Add a SwimStyle column to be able to split data based on bursting
     Swimstyle = as.factor(if_else(
-      AvgEA < (MaxEA/60)+10,
+      AvgEA < 10,
       "Steady",
-      "Burst",
+      "Active",
     )),
     ## Add a Tempgroup column to be able to split data based on the temp threshold identified when looking at VAR/Temp
     Tempgroup = as.factor(if_else(
@@ -116,14 +116,12 @@ Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Sprin
 Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
 
 
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=Swimstyle)) +
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA)) +
   geom_point(alpha=0.5) +
   labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
   #geom_line(aes(x= MaxEA, y= MaxEA/60, col="red"), linewidth=1)+
   geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 0, slope = 2/60, color="red")+
-  geom_abline(intercept = 10, slope =  1/60, color="blue")+
-  geom_vline(xintercept = 600, color="green")
+  geom_abline(intercept = 10, slope =  0, color="blue")
 
 ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA-MaxEA/60)) +
   geom_point(alpha=0.1) +
@@ -141,24 +139,36 @@ ggplot(Full_Data_Out, aes(x = MaxEA, y = VAR, col=Swimstyle)) +
   
 Threshold_Data <- Full_Data_Out %>%
   filter(
-    VAR < 221 & VAR > 220
+    AvgEA == 10,
+  
   )
 
-mean(Threshold_Data$AvgEA)
+hist(Threshold_Data$VAR,
+     xlab = "VAR for AvgEA = 10",
+     breaks = 500,
+     xlim = c(0,500),
+     ylim = c(0,500))
+     
+     
+median(Threshold_Data$VAR)
 
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=LengthFeb)) +
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=BurstScore)) +
+  #facet_wrap(~Biologger)+
   geom_point(alpha=0.1) +
   labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
   geom_abline(intercept = 0, slope = 1/60, color="red")+
   geom_abline(intercept = 0, slope = 1, color="red")+
-  xlim(0,100)+
-  ylim(0,50)
+  #geom_abline(intercept = 10, slope = 0, color="blue")+
+  xlim(0,600)+
+  ylim(0,40)
   #geom_abline(intercept = 10, slope =  1/60, color="blue")
 
 
-ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.VAR)) +
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") 
+ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
+  geom_point(alpha=0.05) +
+  labs(title = "What do we use to determine swimming type ?", x = "Average Acceleration", y = "Variance of acceleration")+
+  #ylim(0, 450)+
+  #xlim(0,20)
 #geom_abline(intercept = 10, slope =  1/60, color="blue")
 
 library(plotly)
