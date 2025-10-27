@@ -1,4 +1,4 @@
-## This script is for analysing the raw activity data, separating winter and spring data
+## This script is for analysing the raw activity data based on a 2 types of swimming model (steady vs dynamic)
 
 library(dplyr)
 library(lubridate)
@@ -61,6 +61,7 @@ Full_Data_Out <- Full_Data_Clean %>%
 ### make sure all covariates are considered correctly
 str(Full_Data_Out$Biologger)
 str(Full_Data_Out$fam)
+str(Full_Data_Out$food)
 str(Full_Data_Out$greb1l)
 str(Full_Data_Out$omy05)
 str(Full_Data_Out$tank)
@@ -83,15 +84,15 @@ Full_Data_Out <- Full_Data_Out %>%
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
     BurstScore = as.factor(if_else(
-      VAR < 89,
+      VAR < 190, ### Value estimated based on visual analysis of party popper plots and clustering data
       0,
       1,
     )),
     ##Add a SwimStyle column to be able to split data based on bursting
     Swimstyle = as.factor(if_else(
-      AvgEA < 10,
+      VAR < 190,
       "Steady",
-      "Active",
+      "Dynamic",
     )),
     ## Add a Tempgroup column to be able to split data based on the temp threshold identified when looking at VAR/Temp
     Tempgroup = as.factor(if_else(
@@ -111,228 +112,9 @@ str(Full_Data_Out$BurstScore)
 str(Full_Data_Out$Swimstyle)
 str(Full_Data_Out$Tempgroup)
 
-### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
-Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
+### Force the plots to show low-temp on the left and high-temp on the right
 Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
-
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA)) +
-  geom_point(alpha=0.5) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
-  #geom_line(aes(x= MaxEA, y= MaxEA/60, col="red"), linewidth=1)+
-  geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 10, slope =  0, color="blue")
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA-MaxEA/60)) +
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration") +
-  geom_abline(intercept = 0, slope = 0, color="red")+
-  geom_abline(intercept = 10, slope = 0, color="blue")
-
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = VAR, col=Swimstyle)) +
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration")+
-  geom_line(aes(x= MaxEA, y= th.VAR), color="red", linewidth=1)
-  
-  
-  
-Threshold_Data <- Full_Data_Out %>%
-  filter(
-    AvgEA == 10,
-  
-  )
-
-hist(Threshold_Data$VAR,
-     xlab = "VAR for AvgEA = 10",
-     breaks = 500,
-     xlim = c(0,500),
-     ylim = c(0,500))
-     
-     
-median(Threshold_Data$VAR)
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=BurstScore)) +
-  #facet_wrap(~Biologger)+
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
-  geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 0, slope = 1, color="red")+
-  #geom_abline(intercept = 10, slope = 0, color="blue")+
-  xlim(0,600)+
-  ylim(0,40)
-  #geom_abline(intercept = 10, slope =  1/60, color="blue")
-
-
-ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
-  geom_point(alpha=0.05) +
-  labs(title = "What do we use to determine swimming type ?", x = "Average Acceleration", y = "Variance of acceleration")+
-  #ylim(0, 450)+
-  #xlim(0,20)
-#geom_abline(intercept = 10, slope =  1/60, color="blue")
-
-library(plotly)
-plot_ly(data = Full_Data_Out, x = ~VAR, y = ~MaxEA, z = ~AvgEA, type = "scatter3d", size = 1, mode = "markers")
-
-Clust <- Full_Data_Out[, c(6, 33, 34)]
-
-Clust_scaled<- scale(Clust[, c("VAR", "AvgEA", "MaxEA")])
-
-Clust_log <- log1p(Clust)
-# Initialize total within sum of squares error: wss
-wss <- 0
-
-# For 1 to 15 cluster centers
-for (i in 1:15) {
-  km.out <- kmeans(clusterScale, centers = i, nstart = 10, iter.max = 100)
-  # Save total within sum of squares to wss variable
-  wss[i] <- km.out$tot.withinss
-}
-
-# Plot total within sum of squares vs. number of clusters
-plot(1:15, wss, type = "b", 
-     xlab = "Number of Clusters", 
-     ylab = "Within groups sum of squares")
-
-
-km.out <- kmeans(clusterScale, centers = 3, nstart = 10)
-
-summary(km.out)
-clusterScale$Cluster <- as.factor(km.out$cluster)
-
-plot_ly(data = Clust, x = ~VAR, y = ~MaxEA, z = ~AvgEA, type = "scatter3d", color=Clust$cluster, size = 1, mode = "markers")
-
-
-
-### Try with gaussian mixture model
-gmm <- Mclust(Clust_scaled, G = 3)
-
-
-Clust$cluster <- gmm$classification
-
-
-# Add cluster assignment
-Full_Data_Out_Cluster$Cluster <- as.factor(gmm$classification)
-Full_Data_Out$Cluster <- as.factor(gmm$classification)
-
-
-
-
-
-
-
-
-
-
-
-### Test the k-means clustering to estimate the VAR threshold
-  # Prep dataset for clustering (remove NAs and "factor" covariate)
-  Full_Data_Out_Cluster <- Full_Data_Out %>%
-    ungroup()%>%
-    select(
-      VAR, MaxEA, AvgEA, 
-    )
-  Full_Data_Out_Cluster_scaled <- scale(Full_Data_Out_Cluster[, c("VAR", "AvgEA", "MaxEA")])
-
-  anyNA(Full_Data_Out_Cluster)
-  any(is.nan(as.matrix(Full_Data_Out_Cluster)))
-  any(is.infinite(as.matrix(Full_Data_Out_Cluster)))
-  
-  str(Full_Data_Out_Cluster$AvgEA)
-  str(Full_Data_Out_Cluster$VAR)
-  str(Full_Data_Out_Cluster$MaxEA)
-  # Initialize total within sum of squares error: wss
-  wss <- 0
-
-  # For 1 to 15 cluster centers
-  for (i in 1:15) {
-    km.out <- kmeans(Full_Data_Out_Cluster_scaled, centers = i, nstart = 10, iter.max = 100)
-    # Save total within sum of squares to wss variable
-    wss[i] <- km.out$tot.withinss
-  }
-
-  # Plot total within sum of squares vs. number of clusters
-  plot(1:15, wss, type = "b", 
-       xlab = "Number of Clusters", 
-       ylab = "Within groups sum of squares")
-  
-  #Could be 2 or 3 culsters
-  
-km.out <- kmeans(Full_Data_Out$VAR, centers = 2, nstart = 20)
-
-summary(km.out)
-
-plot(Full_Data_Out$VAR, 
-     col = km.out$cluster,
-     main = "k-means with 2 clusters",
-     xlab = "",
-     ylab = "")
-
-
-
-
-
-km.out <- kmeans(Full_Data_Out_Cluster, centers = 3, nstart = 20)
-
-summary(km.out)
-
-plot(Full_Data_Out[, c("MaxEA", "AvgEA")], 
-     col = km.out$cluster,
-     main = "k-means with 3 clusters",
-     xlab = "",
-     ylab = "")
-
-
-km.out <- kmeans(Full_Data_Out$VAR, centers = 5, nstart = 20)
-
-summary(km.out)
-
-
-### Try with hierarchical clustering
-
-hclust.out <- hclust(dist(Full_Data_Out$VAR)) #=> Error: cannot allocate vector of size 57.2 Gb
-
-
-### Try with gaussian mixture model
-gmm <- Mclust(Full_Data_Out_Cluster, G = 3)
-
-  # Add cluster assignment
-Full_Data_Out_Cluster$Cluster <- as.factor(gmm$classification)
-Full_Data_Out$Cluster <- as.factor(gmm$classification)
-
-
-#Full_Data_Out_Cluster <- Full_Data_Out %>%
- # mutate(
-  #  DateTime = as.character(DateTime)
- # )
-  # Plot
-ggplot(Full_Data_Out_Cluster, aes(x = MaxEA, y = VAR, col=Cluster)) +
-  geom_point(alpha=0.2) +
-  labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
-  theme_minimal()+
-  xlim(0,100)+
-  ylim(0,200)
-
-summary(gmm)
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.VAR)) +
-  geom_point(alpha=0.2) +
-  labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
-  theme_minimal()+
-  xlim(0,1500)
-
-
-model2 <- flexmix(VAR ~ 1 | Biologger, data = Full_Data_OutTEST, k = 2, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma")))
-
-model3 <- flexmix(VAR ~ MaxEA | Biologger, data = Full_Data_Out, k = 3, model = list(FLXMCmvcombi(VAR ~ .), FLXMCdist1(VAR ~ ., dist = "gamma"), FLXMCdist1(VAR ~ ., dist = "gamma")))
-
-summary(model2)
-
-summary(model3)
-plot(model3)
-
-summary(model5)
-
+Full_Data_Out$food <- factor(Full_Data_Out$food, levels = c("high-food", "low-food"))
 
 
 ### test number and % of 0s
@@ -351,70 +133,55 @@ Full_Data_Out <- Full_Data_Out %>%
 
 str(Full_Data_Out$TimeToNoon)
 
-### make the binomial model with these parameters
+
+
+### Run a 2 steps analysis (derived from 0-altered models)
+
+### First step : binomial model, what decides if a fish is bursting or not ?
 
 B1 <- glmmTMB(BurstScore ~ Tempgroup*food*TimeToNoon + (1 |Biologger )+ (1 |tank )+ (1 |fam ),
               family = "binomial", 
               data = Full_Data_Out)
 
-
-
-#' Is fStandType significant? Apply a likelihood ratio test.
-drop1(B1, test = "Chi")    
-
-#' R^2
-performance(B1) #' Be careful with the interpretation!
-
-#' Numerical output
+# R^2
+performance(B1) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
 summary(B1)
 
-
-#' Get scaled quantile residuals.
+# Get scaled quantile residuals.
 B1Bernqr <- simulateResiduals(fittedModel = B1, plot = FALSE)
 
-#' Check whether these quantile residuals are uniformly distributed.
-par(mfrow = c(1,1), mar = c(5,5,2,2))
-plotQQunif(B1Bernqr, 
-           testUniformity = TRUE, 
-           testOutliers= TRUE,
-           testDispersion = FALSE)
-#' Looks OK.
-
-#' Plot the scaled quantile residuals versus fitted values.
-plotResiduals(B1Bernqr, quantreg = FALSE) 
-#' Looks OK?
-
-
 #' Plot the scaled quantile residuals versus each covariate.
-#' BurnAge
+#' Tempgroup
 plotResiduals(B1Bernqr, 
               quantreg = FALSE,
-              form = Full_Data_Out_TIME$Tempgroup, 
+              form = Full_Data_Out$Tempgroup, 
               xlab = "Tempgroup") 
 
-#' fEcozone
+#' food
 plotResiduals(B1Bernqr, 
               quantreg = FALSE,
-              form = Full_Data_Out_TIME$food, 
+              form = Full_Data_Out$food, 
               xlab = "food") 
 
 
-#' fStandType
+#' greb1l
 plotResiduals(B1Bernqr, 
               quantreg = FALSE,
-              form = Full_Data_Out_TIME$greb1l, 
+              form = Full_Data_Out$greb1l, 
               xlab = "greb1l") 
 
 
-#' fStandType
+#' TimeToNoon
 plotResiduals(B1Bernqr, 
               quantreg = FALSE,
-              form = Full_Data_Out_TIME$TimeToNoon, 
+              form = Full_Data_Out$TimeToNoon, 
               xlab = "Time to noon") 
+# looks bad (red), but significance is because of sample size, but I woud say effect size is neglectable.
 
 
 ### NO EFFECT OF GREB1L ON BURST FREQUENCY WITH THE BERNOULLI METHOD ###
-### Now, wee test the effect of these factors on burst intensity and steady swimming separately
+### Now, we test the effect of these factors on burst intensity and steady swimming separately
 
 
 
@@ -423,7 +190,7 @@ plotResiduals(B1Bernqr,
 
 start_date <- "2025-01-14"
 
-Full_Data_Out_feed <- Full_Data_Out %>% 
+Full_Data_Out_Test <- Full_Data_Out %>% 
   mutate(
     start_date = ymd(start_date),
     days_since_start = as.numeric(difftime(Date, start_date, units = "days")),
@@ -434,7 +201,8 @@ Full_Data_Out_feed <- Full_Data_Out %>%
                        cycle_pos == 1, "OFF",   # feeders OFF
                        "ON"               # feeders ON
                      )
-    )
+    ),
+    feeders = as.factor(feeders)
   )
 
 
@@ -452,7 +220,7 @@ Initial_Daylength <- difftime(Initial_Sunset, Initial_Sunrise, units = "hours")
 
 
 ### Create the Light column based on this
-Full_Data_Out <- Full_Data_Out %>% 
+Full_Data_Out_Test <- Full_Data_Out_Test %>% 
   mutate(
     Initial_Sunrise = hms::hms(Initial_Sunrise),
     Initial_Sunset = hms::hms(Initial_Sunset),
@@ -461,7 +229,7 @@ Full_Data_Out <- Full_Data_Out %>%
     Sunset = as.numeric(Initial_Sunset+days_since_start*(311*60/115)),
   )
 
-Full_Data_Out <- Full_Data_Out %>% 
+Full_Data_Out_Test <- Full_Data_Out_Test %>% 
   mutate(
     Sunrise = hms::hms(Sunrise),
     Sunset = hms::hms(Sunset),
@@ -474,9 +242,25 @@ Full_Data_Out <- Full_Data_Out %>%
   )
 
 
-str(Full_Data_Out$Sunrise)
-str(Full_Data_Out$Sunset)
-str(Full_Data_Out$Light)
+str(Full_Data_Out_Test$Sunrise)
+str(Full_Data_Out_Test$Sunset)
+str(Full_Data_Out_Test$Light)
+str(Full_Data_Out_Test$feeders)
+
+Full_Data_Out_Test$Light <- factor(Full_Data_Out_Test$Light, levels = c("Night", "Day"))
+### First step : binomial model, what decides if a fish is bursting or not ?
+
+B1 <- glmmTMB(BurstScore ~ TimeToNoon*food*Tempgroup + (1 |Biologger )+ (1 |tank )+ (1 |fam ), ## <= Best model (no significant effect of greb1l)
+              family = "binomial", 
+              data = Full_Data_Out)
+
+# R^2
+performance(B1) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(B1)
+
+
+
 
 
 ### Create one df for each season (not the best approach here)
@@ -492,15 +276,94 @@ str(Full_Data_Out$Light)
 
 ### Create one df for each swimstyle
 
-BaselineData <- Full_Data_Out%>%
+DynamicData <- Full_Data_Out_Test%>%
+  filter(
+    Swimstyle == "Dynamic",
+  )
+
+
+
+
+B2 <- glmmTMB(MaxEA ~ Light+(Tempgroup+greb1l)*food + (1 |Biologger ),
+          family = tweedie(link="log"),
+          data = DynamicData)
+
+# R^2
+performance(B2) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(B2)
+
+colSums(DynamicData[, "Light"] == "Day")   
+colSums(DynamicData[, "Light"] == "Night")  
+
+100 * colSums(DynamicData[, "Light"] == "Day") / nrow(DynamicData) #' % of zeros
+
+100 * colSums(SteadyData[, "Light"] == "Day") / nrow(SteadyData) #' % of zeros
+
+100 * colSums(Full_Data_Out_Test[, "Light"] == "Day") / nrow(Full_Data_Out_Test) #' % of zeros
+
+
+
+
+DayData <- Full_Data_Out_Test%>%
+  filter(
+    Light == "Day"
+  )
+
+colSums(DayData[, "Swimstyle"] == "Day")   
+colSums(DayData[, "Swimstyle"] == "Night")  
+
+100 * colSums(DayData[, "Swimstyle"] == "Dynamic") / nrow(DayData) #' % of zeros
+
+
+NightData <- Full_Data_Out_Test%>%
+  filter(
+    Light == "Night",
+  )
+100 * colSums(NightData[, "Swimstyle"] == "Dynamic") / nrow(NightData) #' % of zeros
+
+
+
+
+
+ggplot(DynamicData, aes(x = food, y = MaxEA)) +
+  facet_wrap(~Tempgroup)+
+  geom_boxplot(aes(fill = greb1l)) +
+  labs(title = "WTF is going on?", x="", y = "Average Acceleration") +
+  theme_minimal()
+
+ggplot(DynamicData, aes(x = Time, y = AvgEA)) +
+  facet_wrap(~food+Month)+
+  geom_point(alpha=0.2) +
+  labs(title = "WTF is going on?", x="", y = "Average Acceleration") +
+  theme_minimal()+
+  geom_smooth()
+
+
+
+
+SteadyData <- Full_Data_Out_Test%>%
   filter(
     Swimstyle == "Steady"
   )
 
-FilteredData <- Full_Data_Out%>%
-  filter(
-    Swimstyle == "Burst",
-  )
+
+B3 <- glmmTMB(AvgEA ~ Light + (1 |Biologger) ,
+              family = tweedie(link="log"),
+              data = SteadyData)
+
+# R^2
+performance(B3) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(B3)
+#### 60% of changes in Steady AvgEA is caused by Biologger
+
+ggplot(SteadyData, aes(x = Light, y = AvgEA)) +
+  geom_boxplot(aes(fill=greb1l)) +
+  labs(title = "WTF is going on?", x="", y = "Average Acceleration") +
+  theme_minimal()+
+  geom_smooth(method="lm")
+
 
 
 
