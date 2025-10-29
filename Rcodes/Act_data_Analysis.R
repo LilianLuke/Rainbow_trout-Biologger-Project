@@ -135,62 +135,11 @@ str(Full_Data_Out$TimeToNoon)
 
 
 
-### Run a 2 steps analysis (derived from 0-altered models)
-
-### First step : binomial model, what decides if a fish is bursting or not ?
-
-B1 <- glmmTMB(BurstScore ~ Tempgroup*food*TimeToNoon + (1 |Biologger )+ (1 |tank )+ (1 |fam ),
-              family = "binomial", 
-              data = Full_Data_Out)
-
-# R^2
-performance(B1) # gives KPIs, but hard to decide what is okay or not...
-## R2 values are not great... but I would say OK for this situation
-summary(B1)
-
-# Get scaled quantile residuals.
-B1Bernqr <- simulateResiduals(fittedModel = B1, plot = FALSE)
-
-#' Plot the scaled quantile residuals versus each covariate.
-#' Tempgroup
-plotResiduals(B1Bernqr, 
-              quantreg = FALSE,
-              form = Full_Data_Out$Tempgroup, 
-              xlab = "Tempgroup") 
-
-#' food
-plotResiduals(B1Bernqr, 
-              quantreg = FALSE,
-              form = Full_Data_Out$food, 
-              xlab = "food") 
-
-
-#' greb1l
-plotResiduals(B1Bernqr, 
-              quantreg = FALSE,
-              form = Full_Data_Out$greb1l, 
-              xlab = "greb1l") 
-
-
-#' TimeToNoon
-plotResiduals(B1Bernqr, 
-              quantreg = FALSE,
-              form = Full_Data_Out$TimeToNoon, 
-              xlab = "Time to noon") 
-# looks bad (red), but significance is because of sample size, but I woud say effect size is neglectable.
-
-
-### NO EFFECT OF GREB1L ON BURST FREQUENCY WITH THE BERNOULLI METHOD ###
-### Now, we test the effect of these factors on burst intensity and steady swimming separately
-
-
-
-
 #determine whether fedeers are ON or OFF based on date and feeders rhythm
 
 start_date <- "2025-01-14"
 
-Full_Data_Out_Test <- Full_Data_Out %>% 
+Full_Data_Out <- Full_Data_Out %>% 
   mutate(
     start_date = ymd(start_date),
     days_since_start = as.numeric(difftime(Date, start_date, units = "days")),
@@ -220,7 +169,7 @@ Initial_Daylength <- difftime(Initial_Sunset, Initial_Sunrise, units = "hours")
 
 
 ### Create the Light column based on this
-Full_Data_Out_Test <- Full_Data_Out_Test %>% 
+Full_Data_Out <- Full_Data_Out %>% 
   mutate(
     Initial_Sunrise = hms::hms(Initial_Sunrise),
     Initial_Sunset = hms::hms(Initial_Sunset),
@@ -229,7 +178,7 @@ Full_Data_Out_Test <- Full_Data_Out_Test %>%
     Sunset = as.numeric(Initial_Sunset+days_since_start*(311*60/115)),
   )
 
-Full_Data_Out_Test <- Full_Data_Out_Test %>% 
+Full_Data_Out <- Full_Data_Out %>% 
   mutate(
     Sunrise = hms::hms(Sunrise),
     Sunset = hms::hms(Sunset),
@@ -242,22 +191,86 @@ Full_Data_Out_Test <- Full_Data_Out_Test %>%
   )
 
 
-str(Full_Data_Out_Test$Sunrise)
-str(Full_Data_Out_Test$Sunset)
-str(Full_Data_Out_Test$Light)
-str(Full_Data_Out_Test$feeders)
+str(Full_Data_Out$Sunrise)
+str(Full_Data_Out$Sunset)
+str(Full_Data_Out$Light)
+str(Full_Data_Out$feeders)
 
-Full_Data_Out_Test$Light <- factor(Full_Data_Out_Test$Light, levels = c("Night", "Day"))
+Full_Data_Out$Light <- factor(Full_Data_Out$Light, levels = c("Night", "Day"))
+
+
+
+### First run a glmm on the whole data
+
+F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger ), ## <= Best model (no significant effect of greb1l)
+              family = tweedie(link="log"), 
+              data = Full_Data_Out)
+
+# R^2
+performance(F1) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F1)
+
+
+
+EMM <- emmeans(F1, ~greb1l:food:Light, data=Full_Data_Out) 
+EMM_resp <- regrid(EMM)
+pairs(EMM_resp, adjust="none")
+
+
+
+# Get scaled quantile residuals.
+F1Bernqr <- simulateResiduals(fittedModel = F1, plot = FALSE)
+
+#' Plot the scaled quantile residuals versus each covariate.
+#' Tempgroup
+plotResiduals(F1Bernqr, 
+              quantreg = FALSE,
+              form = Full_Data_Out$Tempgroup, 
+              xlab = "Tempgroup") 
+
+#' food
+plotResiduals(F1Bernqr, 
+              quantreg = FALSE,
+              form = Full_Data_Out$food, 
+              xlab = "food") 
+
+
+#' greb1l
+plotResiduals(F1Bernqr, 
+              quantreg = FALSE,
+              form = Full_Data_Out$greb1l, 
+              xlab = "greb1l") 
+
+
+#' TimeToNoon
+plotResiduals(F1Bernqr, 
+              quantreg = FALSE,
+              form = Full_Data_Out$TimeToNoon, 
+              xlab = "Light") 
+
+
+
+
+ggplot(Full_Data_Out, aes(x = food, y = AvgEA)) +
+  facet_wrap(~Light)+
+  geom_boxplot(aes(fill = greb1l)) +
+  theme_minimal()
+
+### The analysis of ACT parameters on full data makes no sense
+
+### Run a 2 steps analysis (derived from 0-altered models)
+
 ### First step : binomial model, what decides if a fish is bursting or not ?
 
-B1 <- glmmTMB(BurstScore ~ TimeToNoon*food*Tempgroup + (1 |Biologger )+ (1 |tank )+ (1 |fam ), ## <= Best model (no significant effect of greb1l)
+F2 <- glmmTMB(BurstScore ~ TimeToNoon*food*Tempgroup + (1 |Biologger )+ (1 |tank )+ (1 |fam ), ## <= Best model (no significant effect of greb1l)
               family = "binomial", 
               data = Full_Data_Out)
 
 # R^2
-performance(B1) # gives KPIs, but hard to decide what is okay or not...
+performance(F2) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
-summary(B1)
+summary(F2)
 
 
 
@@ -276,7 +289,7 @@ summary(B1)
 
 ### Create one df for each swimstyle
 
-DynamicData <- Full_Data_Out_Test%>%
+DynamicData <- Full_Data_Out%>%
   filter(
     Swimstyle == "Dynamic",
   )
@@ -284,14 +297,14 @@ DynamicData <- Full_Data_Out_Test%>%
 
 
 
-B2 <- glmmTMB(MaxEA ~ Light+(Tempgroup+greb1l)*food + (1 |Biologger ),
+D2 <- glmmTMB(MaxEA ~ Light*Tempgroup*food*greb1l + (1 |Biologger ),
           family = tweedie(link="log"),
           data = DynamicData)
 
 # R^2
-performance(B2) # gives KPIs, but hard to decide what is okay or not...
+performance(D2) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
-summary(B2)
+summary(D2)
 
 colSums(DynamicData[, "Light"] == "Day")   
 colSums(DynamicData[, "Light"] == "Night")  
@@ -329,7 +342,7 @@ NightData <- Full_Data_Out_Test%>%
 ggplot(DynamicData, aes(x = food, y = MaxEA)) +
   facet_wrap(~Tempgroup)+
   geom_boxplot(aes(fill = greb1l)) +
-  labs(title = "WTF is going on?", x="", y = "Average Acceleration") +
+  labs(title = "WTF is going on?", x="", y = "Maximum Acceleration") +
   theme_minimal()
 
 ggplot(DynamicData, aes(x = Time, y = AvgEA)) +
@@ -342,20 +355,20 @@ ggplot(DynamicData, aes(x = Time, y = AvgEA)) +
 
 
 
-SteadyData <- Full_Data_Out_Test%>%
+SteadyData <- Full_Data_Out%>%
   filter(
     Swimstyle == "Steady"
   )
 
 
-B3 <- glmmTMB(AvgEA ~ Light + (1 |Biologger) ,
+S1 <- glmmTMB(AvgEA ~ Light + (1 |Biologger) ,
               family = tweedie(link="log"),
               data = SteadyData)
 
 # R^2
-performance(B3) # gives KPIs, but hard to decide what is okay or not...
+performance(S1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
-summary(B3)
+summary(S1)
 #### 60% of changes in Steady AvgEA is caused by Biologger
 
 ggplot(SteadyData, aes(x = Light, y = AvgEA)) +
