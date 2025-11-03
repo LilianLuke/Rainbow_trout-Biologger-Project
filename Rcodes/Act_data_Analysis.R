@@ -202,7 +202,7 @@ Full_Data_Out$Light <- factor(Full_Data_Out$Light, levels = c("Night", "Day"))
 
 ### First run a glmm on the whole data
 
-F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger ), ## <= Best model (no significant effect of greb1l)
+F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger) + (1|tank) + (1|fam), ## <= Best model (no significant effect of greb1l)
               family = tweedie(link="log"), 
               data = Full_Data_Out)
 
