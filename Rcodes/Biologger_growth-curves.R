@@ -145,19 +145,24 @@ ggplot(
 
 ## Looks like there is a greb effect in food-restricted ;/ 
 
+Full_Meas_Data_Clean$greb1l <- dplyr::recode(Full_Meas_Data_Clean$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
+
+
 ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Length),
 ) +
   facet_wrap(~food)+
-  geom_boxplot(aes(fill=greb1l))
+  geom_boxplot(aes(fill=greb1l))+
+  scale_fill_manual(values = c("gold2", "royalblue"))
 
 ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight),
 ) +
   facet_wrap(~food)+
-  geom_boxplot(aes(fill=greb1l))
+  geom_boxplot(aes(fill=greb1l))+
+  scale_fill_manual(values = c("gold2", "royalblue"))
 
 
 

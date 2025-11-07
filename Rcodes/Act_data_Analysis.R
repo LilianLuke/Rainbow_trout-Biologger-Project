@@ -83,7 +83,7 @@ Full_Data_Out <- Full_Data_Out %>%
 ### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
-    BurstScore = as.factor(if_else(
+    BurstScore = as.numeric(if_else(
       VAR < 190, ### Value estimated based on visual analysis of party popper plots and clustering data
       0,
       1,
@@ -202,7 +202,7 @@ Full_Data_Out$Light <- factor(Full_Data_Out$Light, levels = c("Night", "Day"))
 
 ### First run a glmm on the whole data
 
-F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger) + (1|tank) + (1|fam), ## <= Best model (no significant effect of greb1l)
+F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank)+ (1 | fam), ## <= Best model ?
               family = tweedie(link="log"), 
               data = Full_Data_Out)
 
@@ -213,10 +213,25 @@ summary(F1)
 
 
 
-EMM <- emmeans(F1, ~greb1l:food:Light, data=Full_Data_Out) 
-EMM_resp <- regrid(EMM)
-pairs(EMM_resp, adjust="none")
+EMM1 <- emmeans(F1, ~greb1l:food:Light, data=Full_Data_Out) 
+EMM_resp1 <- regrid(EMM1)
+pairs(EMM_resp1)
 
+
+F2 <- glmmTMB(log(MaxEA) ~ LengthFeb:food + Light*Tempgroup*food*greb1l + (1 | Biologger), ## <= Best model ?
+              family = tweedie(link="log"), 
+              data = Full_Data_Out)
+
+# R^2
+performance(F2) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F2)
+
+
+
+EMM2 <- emmeans(F2, ~greb1l:food:Light, data=Full_Data_Out) 
+EMM_resp2 <- regrid(EMM2)
+pairs(EMM_resp2, adjust="none")
 
 
 # Get scaled quantile residuals.
@@ -251,11 +266,39 @@ plotResiduals(F1Bernqr,
 
 
 
+ggplot(Full_Data_Out, aes(x = DateTime, y = AvgEA)) +
+  geom_point(alpha=.2) +
+  labs(title = "Average Acceleration accross the measurement period", x="", y = "Average acceleration (mg)") +
+  theme_minimal()+
+  geom_smooth()
+
+
+
+ggplot(Full_Data_Out, aes(x = DateTime, y = MaxEA)) +
+  geom_point(alpha=.2) +
+  labs(title = "Maximum Acceleration accross the measurement period", x="", y = "Maximum acceleration (mg)") +
+  theme_minimal()+
+  geom_smooth()
+
+
 
 ggplot(Full_Data_Out, aes(x = food, y = AvgEA)) +
   facet_wrap(~Light)+
   geom_boxplot(aes(fill = greb1l)) +
   theme_minimal()
+
+
+ggplot(Full_Data_Out, aes(x = food, y = MaxEA)) +
+  facet_wrap(~Light+Tempgroup)+
+  geom_boxplot(aes(fill = greb1l)) +
+  theme_minimal()
+
+ggplot(Full_Data_Out, aes(x = LengthFeb, y = MaxEA)) +
+  facet_wrap(~Light+Tempgroup)+
+  geom_point(aes(col = food)) +
+  theme_minimal()+
+  geom_smooth(aes(col = food))
+
 
 ### The analysis of ACT parameters on full data makes no sense
 
@@ -263,17 +306,45 @@ ggplot(Full_Data_Out, aes(x = food, y = AvgEA)) +
 
 ### First step : binomial model, what decides if a fish is bursting or not ?
 
-F2 <- glmmTMB(BurstScore ~ TimeToNoon*food*Tempgroup + (1 |Biologger )+ (1 |tank )+ (1 |fam ), ## <= Best model (no significant effect of greb1l)
+F3 <- glmmTMB(BurstScore ~ TimeToNoon*food*Tempgroup + (1 |Biologger )+ (1 |tank )+ (1 |fam ),  ## <= Best model
               family = "binomial", 
               data = Full_Data_Out)
 
 # R^2
-performance(F2) # gives KPIs, but hard to decide what is okay or not...
+performance(F3) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
-summary(F2)
+summary(F3)
 
 
+## Plot the results
 
+Full_Data_grouped <- Full_Data_Out%>%  
+  group_by(food, Light, Tempgroup, Biologger) %>%
+  summarise(
+    BurstProp = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
+    mean_AvgEA = as.numeric(mean(AvgEA, na.rm = TRUE)),
+    mean_MaxEA = as.numeric(mean(MaxEA, na.rm = TRUE)),
+    mean_VAR = as.numeric(mean(VAR, na.rm = TRUE)),
+    mean_cAvgEA = as.numeric(mean(corr.AvgEA, na.rm = TRUE)),
+    mean_cVAR = as.numeric(mean(corr.VAR, na.rm = TRUE)),
+    Month = first(Month),
+    Biologger = first(Biologger),
+    greb1l = first(greb1l),
+    food = first(food),
+    fam = first(fam),
+    tank = first(tank),
+    Light = first(Light),
+    Season = first(Season),
+    LengthFeb = first(LengthFeb),
+    WeightFeb = first(WeightFeb),
+    Tempgroup = first(Tempgroup),
+  )
+
+ggplot(Full_Data_grouped, aes(x = Light, y = BurstProp)) +
+  facet_wrap(~Tempgroup)+
+  geom_boxplot(aes(fill = food)) +
+  labs(title = "Bursting proportion per group", x="", y = "Proportion of active swimming measurement") +
+  scale_fill_manual(values = c("darkgreen", "palegreen2"))
 
 
 ### Create one df for each season (not the best approach here)
@@ -296,9 +367,19 @@ DynamicData <- Full_Data_Out%>%
 
 
 
+D1 <- glmmTMB(AvgEA ~ Light+Tempgroup*food + (1 |tank) + (1|fam) + (1 |Biologger), # <= Best model, no effect of greb1l
+              family = tweedie(link="log"),
+              data = DynamicData)
 
-D2 <- glmmTMB(MaxEA ~ Light*Tempgroup*food*greb1l + (1 |Biologger ),
-          family = tweedie(link="log"),
+# R^2
+performance(D1) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(D1)
+
+
+
+D2 <- glmmTMB(MaxEA ~ Light+(Tempgroup+greb1l)*food + (1|tank) + (1|fam) + (1 |Biologger),
+          family = tweedie(link = "log"),
           data = DynamicData)
 
 # R^2
@@ -306,8 +387,31 @@ performance(D2) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
 summary(D2)
 
-colSums(DynamicData[, "Light"] == "Day")   
-colSums(DynamicData[, "Light"] == "Night")  
+
+D3 <- glmmTMB(MaxEA ~ Light+(Tempgroup+LengthFeb)*food + (1|tank) + (1|fam) + (1 |Biologger),
+              family = tweedie(link = "log"),
+              data = DynamicData)
+
+# R^2
+performance(D3) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(D3)
+
+
+sapply(DynamicData[c("fam","Biologger","tank")], function(x) length(unique(x)))
+table(DynamicData$fam)     # voir si certains niveaux n'ont qu'1 obs
+table(DynamicData$Biologger)
+table(DynamicData$tank)
+
+# tables croisées rapides
+table(DynamicData$Biologger, DynamicData$fam)[1:129, 1:3]   # aperçu
+table(DynamicData$Biologger, DynamicData$tank)[1:129, 1:6] 
+
+
+
+
+colSums(DynamicData[, "greb1l"] == "Allele 1")   
+colSums(DynamicData[, "greb1l"] == "Allele 2")  
 
 100 * colSums(DynamicData[, "Light"] == "Day") / nrow(DynamicData) #' % of zeros
 
@@ -372,7 +476,7 @@ summary(S1)
 #### 60% of changes in Steady AvgEA is caused by Biologger
 
 ggplot(SteadyData, aes(x = Light, y = AvgEA)) +
-  geom_boxplot(aes(fill=greb1l)) +
+  geom_boxplot() +
   labs(title = "WTF is going on?", x="", y = "Average Acceleration") +
   theme_minimal()+
   geom_smooth(method="lm")
