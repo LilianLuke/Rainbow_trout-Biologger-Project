@@ -151,65 +151,134 @@ Full_Data_Out <- Full_Data_Out %>%
                        "ON"               # feeders ON
                      )
     ),
-    feeders = as.factor(feeders)
+    fasting_day = ifelse(
+                       cycle_pos == 1, "Fasting",   # fasting day for low-food group
+                       "Ad Libitum"               # feeding day for low-food group
+                     ),
+    feeders = as.factor(feeders),
+    fasting_day = as.factor(fasting_day),
   )
+
 
 
 ### Because not enough data in the burst data set to add Time as a covariate (some time groups are empty or 1), we will group by day/night instead
-###Estimate sunrise and sunset based on https://www.timeanddate.com/sun/finland/lahti data. Nautical twilight was considered to be night.
 
-Initial_Sunrise <- as.numeric(3600*8+60*18)
-Initial_Sunset <- as.numeric(3600*16+60*34)
+#Import suntable obtained from NOAA solar calculator (and formated in excel)
+sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/NOAA_SunTimes.xlsx")
+sun_table <- sun_table %>%
+  select(Date, Sunrise, Sunset)
 
-### Test the difftime function
-Initial_Daylength <- difftime(Initial_Sunset, Initial_Sunrise, units = "hours")
+#Add the sunrise and sunset to the main dataframe
+Full_Data_Out <- Full_Data_Out %>%
+  left_join(sun_table, by = "Date")
 
-### daily change in sunset and sunrise were calculated as (|"sunrise time on 14/01" - "sunrise time on 09/05"|)/"number of days between 14/01 and 09/05"
-### which were 333/115 for sunrise and 311/115 for sunset in mins/day, so multiply times 60 to get secs/day
-
-
-### Create the Light column based on this
+#Convert times to a time format and rename columns
 Full_Data_Out <- Full_Data_Out %>% 
   mutate(
-    Initial_Sunrise = hms::hms(Initial_Sunrise),
-    Initial_Sunset = hms::hms(Initial_Sunset),
-    days_since_start = as.numeric(difftime(Date, start_date, units = "days")),
-    Sunrise = as.numeric(Initial_Sunrise-days_since_start*(333*60/115)),
-    Sunset = as.numeric(Initial_Sunset+days_since_start*(311*60/115)),
+    Sunrise = hm(Sunrise),
+    Sunset = hm(Sunset),
+    Daylength = as.numeric(Sunset-Sunrise)
+  )%>%
+  rename(
+    NOAA_Sunrise = Sunrise,
+    NOAA_Sunset = Sunset,
   )
 
+#Create a Light factor based on surise and sunset times
 Full_Data_Out <- Full_Data_Out %>% 
   mutate(
-    Sunrise = hms::hms(Sunrise),
-    Sunset = hms::hms(Sunset),
-    Light = as.factor(ifelse(Time < Sunrise, 
+    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
+    NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(Time),
+    Light = as.factor(ifelse(Time < NOAA_Sunrise, 
                              "Night",
-                             ifelse(Time < Sunset,
+                             ifelse(Time < NOAA_Sunset,
                                     "Day",
                                     "Night"))
     ),
+    Time = as.numeric(Time),
+    am_pm = if_else( 
+      Time > 43201,
+      "PM",
+      "AM"),
+    am_pm = as.factor(am_pm),
+    
+  )%>% 
+  mutate(
+    Time = hms::hms(Time),
   )
 
 
-str(Full_Data_Out$Sunrise)
-str(Full_Data_Out$Sunset)
+
+#Calculate Daylength?
+Full_Data_Out <- Full_Data_Out %>% 
+  mutate(
+    NOAA_Sunrise = as.numeric(NOAA_Sunrise),
+    NOAA_Sunset = as.numeric(NOAA_Sunset),
+    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins")
+  )%>%
+  mutate(
+    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
+    NOAA_Sunset = hms::hms(NOAA_Sunset),
+  )
+
+
+
+str(Full_Data_Out$NOAA_Sunrise)
+str(Full_Data_Out$NOAA_Sunset)
 str(Full_Data_Out$Light)
 str(Full_Data_Out$feeders)
+str(Full_Data_Out$DayLength)
 
 Full_Data_Out$Light <- factor(Full_Data_Out$Light, levels = c("Night", "Day"))
 
 
+Full_Data_Out <- Full_Data_Out %>% 
+  mutate(
+    Date = ymd(Date),
+    start_date = ymd(start_date),
+  )%>%
+  mutate(
+    MeasNB = floor(as.numeric(Date-start_date)/6)+1
+  )%>%
+  mutate(
+    MeasNB = as.factor(MeasNB)
+  )
+  
+#write_xlsx(Full_Data_Out, paste0(path.data, "/Biologger final data.xlsx"))
+#write_csv(Full_Data_Out, paste0(path.data, "/Biologger final data.csv"))
 
 ### First run a glmm on the whole data
 
-F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank)+ (1 | fam), ## <= Best model ?
+F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank), ## <= Best model ?
               family = tweedie(link="log"), 
               data = Full_Data_Out)
+
+
+Full_Data_Day <- Full_Data_Out%>%
+  filter(
+    Light == "Day",
+  )
+
+F1 <- glmmTMB(log(AvgEA) ~ Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank)+ (1 | fam), ## <= Best model ?
+              family = tweedie(link="log"), 
+              data = Full_Data_Day)
+
 
 # R^2
 performance(F1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
 summary(F1)
+
+Full_Data_Day <- Full_Data_Out %>% 
+  filter(
+    Light == "Day"
+    )
+
+F1 <- glmmTMB(log(AvgEA) ~ Tempgroup*food*greb1l + (1 | Biologger), ## <= Best model ?
+              family = tweedie(link="log"), 
+              data = Full_Data_Day)
+
 
 
 
@@ -293,11 +362,9 @@ ggplot(Full_Data_Out, aes(x = food, y = MaxEA)) +
   geom_boxplot(aes(fill = greb1l)) +
   theme_minimal()
 
-ggplot(Full_Data_Out, aes(x = LengthFeb, y = MaxEA)) +
-  facet_wrap(~Light+Tempgroup)+
-  geom_point(aes(col = food)) +
-  theme_minimal()+
-  geom_smooth(aes(col = food))
+ggplot(Full_Data_Out, aes(x = MeasNB, y = log(VAR))) +
+  geom_boxplot()+
+  theme_minimal()
 
 
 ### The analysis of ACT parameters on full data makes no sense
@@ -358,6 +425,8 @@ ggplot(Full_Data_grouped, aes(x = Light, y = BurstProp)) +
 #    Season == "Winter"
 #  )
 
+
+### Step 2: quantitative analysis of active and steady swimming separately
 ### Create one df for each swimstyle
 
 DynamicData <- Full_Data_Out%>%
@@ -367,7 +436,7 @@ DynamicData <- Full_Data_Out%>%
 
 
 
-D1 <- glmmTMB(AvgEA ~ Light+Tempgroup*food + (1 |tank) + (1|fam) + (1 |Biologger), # <= Best model, no effect of greb1l
+D1 <- glmmTMB(corr.AvgEA ~ Light*Tempgroup*food*greb1l + (1 |tank) + (1|fam) + (1 |Biologger), # <= Best model, no effect of greb1l
               family = tweedie(link="log"),
               data = DynamicData)
 
@@ -376,9 +445,63 @@ performance(D1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
 summary(D1)
 
+ggplot(DynamicData, aes(x = food, y = corr.AvgEA)) +
+  facet_wrap(~Light+Tempgroup)+
+  geom_boxplot(aes(fill = greb1l)) +
+  theme_minimal() +
+  scale_fill_manual(values = c("lightblue3", "darkred"))
+
+EMMD1 <- emmeans(D1, ~Light:food:Tempgroup:greb1l, data=DynamicData) 
+EMM_respD1 <- regrid(EMMD1)
+pairs(EMM_respD1, adjust="none")
 
 
-D2 <- glmmTMB(MaxEA ~ Light+(Tempgroup+greb1l)*food + (1|tank) + (1|fam) + (1 |Biologger),
+DynamicDayta <- DynamicData%>%
+  filter(
+    Light == "Day",
+  )
+
+D1bis <- glmmTMB(scale(AvgEA)+10 ~ Tempgroup*food*greb1l + (1 |Biologger)+ (1 |tank), # <= Best model, no effect of greb1l
+              family = tweedie(link="log"),
+              data = DynamicDayta)
+# R^2
+performance(D1bis) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... but I would say OK for this situation
+summary(D1bis)
+
+ggplot(DynamicData, aes(x = food, y = corr.AvgEA)) +
+  facet_wrap(~Light+Tempgroup)+
+  geom_boxplot(aes(fill = greb1l)) +
+  theme_minimal() +
+  scale_fill_manual(values = c("lightblue3", "darkred"))
+
+
+# Get scaled quantile residuals.
+D1bisBernqr <- simulateResiduals(fittedModel = D1bis, plot = FALSE)
+
+#' Plot the scaled quantile residuals versus each covariate.
+#' Tempgroup
+plotResiduals(D1bisBernqr, 
+              quantreg = FALSE,
+              form = DynamicDayta$Tempgroup, 
+              xlab = "Tempgroup") 
+
+#' food
+plotResiduals(D1bisBernqr, 
+              quantreg = FALSE,
+              form = DynamicDayta$food, 
+              xlab = "food") 
+
+
+#' greb1l
+plotResiduals(D1bisBernqr, 
+              quantreg = FALSE,
+              form = DynamicDayta$greb1l, 
+              xlab = "greb1l") 
+
+
+
+D2 <- glmmTMB(MaxEA ~ Light+(Tempgroup+greb1l)*food+ (1|LengthFeb) + (1|tank) + (1|fam) + (1 |Biologger),
           family = tweedie(link = "log"),
           data = DynamicData)
 
@@ -387,14 +510,50 @@ performance(D2) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... but I would say OK for this situation
 summary(D2)
 
+ggplot(DynamicData, aes(x = greb1l, y = MaxEA)) +
+  geom_boxplot(aes(fill = food)) +
+  theme_minimal() +
+  scale_fill_manual(values = c("darkgreen", "palegreen2"))
 
-D3 <- glmmTMB(MaxEA ~ Light+(Tempgroup+LengthFeb)*food + (1|tank) + (1|fam) + (1 |Biologger),
+ggplot(DynamicData, aes(x = Tempgroup, y = MaxEA)) +
+  geom_boxplot(aes(fill = food)) +
+  theme_minimal() +
+  scale_fill_manual(values = c("darkgreen", "palegreen2"))
+
+
+
+EMMD2 <- emmeans(D2, ~greb1l:food, data=Full_Data_Out) 
+EMM_respD2 <- regrid(EMMD2)
+pairs(EMM_respD2)
+
+EMMD2 <- emmeans(D2, ~food:Tempgroup, data=Full_Data_Out) 
+EMM_respD2 <- regrid(EMMD2)
+pairs(EMM_respD2)
+
+
+ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.AvgEA, col=feeders)) +
+  facet_wrap(~food+Light)+
+  geom_point(alpha=0.2) +
+  theme_minimal()
+
+ggplot(DynamicData, aes(x = Light, y = corr.AvgEA, fill=fasting_day)) +
+  facet_wrap(~food+am_pm)+
+  geom_boxplot()+
+  theme_minimal()
+
+ggplot(Full_Data_Out, aes(x = feeders, y = corr.AvgEA, col=greb1l)) +
+  facet_wrap(~food+Light)+
+  stat_summary(fun.data = "mean_sdl") +
+  theme_minimal()
+
+
+D3 <- glmmTMB(MaxEA ~ Light+Tempgroup*greb1l*food + (1|LengthFeb)+ (1|tank) + (1|fam) + (1 |Biologger),
               family = tweedie(link = "log"),
               data = DynamicData)
 
 # R^2
 performance(D3) # gives KPIs, but hard to decide what is okay or not...
-## R2 values are not great... but I would say OK for this situation
+## AIC is lesser than using food
 summary(D3)
 
 

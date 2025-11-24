@@ -1,6 +1,5 @@
 ### This Script is for looking at the effect of activity on physiological parameters 
 
-
 library(dplyr)
 library(lubridate)
 library(purrr)
@@ -27,13 +26,42 @@ library(lsmeans)
 library(emmeans)
 library(tools)
 library(ggeffects)
+library(DHARMa)
+library(glmmTMB)
+library(performance)
 
-setwd(path.data)
-
-Full_Data_Clean <- read_xlsx("Biologger Clean data.xlsx") 
+source("path_file_lilian.R")
 
 
-Full_Data_Out <- Full_Data_Clean %>%
+Full_Data <- read_xlsx(paste0(path.data, "Biologger Final data.xlsx")) 
+
+Full_Data <- Full_Data %>%
+  select(
+    !Season
+    )%>%
+  rename(
+    Season = Tempgroup
+  )%>%
+  mutate(
+    Season=recode_factor(
+    Season, "LowTemp" = "Winter",  "HighTemp" = "Spring")
+    )
+
+
+### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
+Full_Data$Season <- factor(Full_Data$Season, levels = c("Winter", "Spring"))
+
+Xray_data_clean <- read_xlsx(paste0(path.data,"Biologger Physio data.xlsx"))
+
+str(Xray_data_clean$fatpercent)
+str(Xray_data_clean$fatmass)
+
+
+Full_Data_ActnPhysio <- Full_Data %>%
+  left_join(Xray_data_clean, by = "Biologger")
+
+
+Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
   mutate(
     greb1l = as.factor(greb1l),
     omy05 = as.factor(omy05),
@@ -41,90 +69,130 @@ Full_Data_Out <- Full_Data_Clean %>%
     fam = as.factor(fam),
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
-  ) %>%
-  ## Convert Date and Time back to a format that can be plotted correctly
-  mutate(
     Date = ymd(Date),
     Time = hms(Time),
+    BurstScore = as.numeric(BurstScore),
+    Swimstyle = as.factor(Swimstyle),
+    Season = as.factor(Season),
+    Light = as.factor(Light),
+    feeders = as.factor(feeders),
+    fatmass = as.numeric(fatmass),
+    fatpercent = as.numeric(fatpercent),
+    WeightMay = as.numeric(WeightMay),
+    WeightMayDXA = as.numeric(WeightMayDXA),
+    NOAA_Sunrise = hms(NOAA_Sunrise),
+    NOAA_Sunset = hms(NOAA_Sunset),
+    MeasNB = as.factor(MeasNB)
   )%>%
-  filter (
-    !AvgEA == MaxEA
-  ) %>%
-##Create a log column for each act parameter to be able to run GAMMS on it
   mutate(
-    LogAvgEA = as.numeric(log10(`AvgEA`+0.001)),
-    LogMaxEA = as.numeric(log10(`MaxEA`+0.001)),
-    LogVAR = as.numeric(log10(VAR+0.76)),
+    NOAA_Sunrise = as.numeric(NOAA_Sunrise),
+    NOAA_Sunset = as.numeric(NOAA_Sunset),
+    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins")
   )%>%
-##Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
   mutate(
-    BurstScore = as.numeric(if_else(
-      VAR < 220,
-      0,
-      1,
-    )),
-    ##Add a SwimStyle column to be able to split data based on bursting
-    Swimstyle = as.factor(if_else(
-      VAR < 220,
-      "Steady",
-      "Burst",
-    )),
-    ## Add a Tempgroup column to be able to split data based on the temp threshold identified when looking at VAR/Temp
-    Tempgroup = as.factor(if_else(
-      Temp < 4.5,
-      "LowTemp",
-      "HighTemp"
-    )),
-  ) 
-
+    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
+    NOAA_Sunset = hms::hms(NOAA_Sunset),
+  )
 
 
 ## make sure factors are read correctly
-str(Full_Data_Out$Biologger)
-str(Full_Data_Out$fam)
-str(Full_Data_Out$greb1l)
-str(Full_Data_Out$omy05)
-str(Full_Data_Out$tank)
-str(Full_Data_Out$Date)
-str(Full_Data_Out$Time)
-str(Full_Data_Out$DateTime)
-str(Full_Data_Out$BurstScore)
-str(Full_Data_Out$Swimstyle)
-str(Full_Data_Out$Tempgroup)
-
-### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
-Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
-Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
-
-Xray_data_clean <- read_xlsx("Biologger Physio data.xlsx") 
-
-str(Xray_data_clean$fatpercent)
-str(Xray_data_clean$fatmass)
+str(Full_Data_ActnPhysio$Biologger)
+str(Full_Data_ActnPhysio$fam)
+str(Full_Data_ActnPhysio$greb1l)
+str(Full_Data_ActnPhysio$omy05)
+str(Full_Data_ActnPhysio$tank)
+str(Full_Data_ActnPhysio$Date)
+str(Full_Data_ActnPhysio$Time)
+str(Full_Data_ActnPhysio$DateTime)
+str(Full_Data_ActnPhysio$BurstScore)
+str(Full_Data_ActnPhysio$Swimstyle)
+str(Full_Data_ActnPhysio$Season)
+str(Full_Data_ActnPhysio$Light)
+str(Full_Data_ActnPhysio$feeders)
+str(Full_Data_ActnPhysio$DayLength)
+str(Full_Data_ActnPhysio$NOAA_Sunrise)
+str(Full_Data_ActnPhysio$NOAA_Sunset)
+str(Full_Data_ActnPhysio$MeasNB)
 
 
-Full_Data_ActnPhysio <- Full_Data_Out %>%
-  left_join(Xray_data_clean, by = "Biologger")
-
-write_xlsx(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.xlsx"))
-write_csv(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.csv"))
+#write_xlsx(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.xlsx"))
+#write_csv(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.csv"))
 
 
 
-Data <- read_xlsx("Biologger act&physio data.xlsx") 
+Data <- read_xlsx(paste0(path.data, "Biologger act&physio data.xlsx"))
 
+Data <- Data %>%
+  mutate(
+    greb1l = as.factor(greb1l),
+    omy05 = as.factor(omy05),
+    food = as.factor(food),
+    fam = as.factor(fam),
+    tank = as.factor(tank),
+    Biologger = as.factor(Biologger),
+    Date = ymd(Date),
+    Time = hms::hms(Time),
+    BurstScore = as.numeric(BurstScore),
+    Swimstyle = as.factor(Swimstyle),
+    Season = as.factor(Season),
+    Light = as.factor(Light),
+    feeders = as.factor(feeders),
+    fatmass = as.numeric(fatmass),
+    fatpercent = as.numeric(fatpercent),
+    WeightMay = as.numeric(WeightMay),
+    WeightMayDXA = as.numeric(WeightMayDXA),
+    NOAA_Sunrise = hms(NOAA_Sunrise),
+    NOAA_Sunset = hms(NOAA_Sunset),
+    MeasNB = as.numeric(MeasNB),
+  )%>%
+  mutate(
+    NOAA_Sunrise = as.numeric(NOAA_Sunrise),
+    NOAA_Sunset = as.numeric(NOAA_Sunset),
+    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins"),
+    MeasNB = as.factor(MeasNB),
+  )%>%
+  mutate(
+    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
+    NOAA_Sunset = hms::hms(NOAA_Sunset),
+  )
+
+
+
+str(Data$Biologger)
+str(Data$fam)
+str(Data$greb1l)
+str(Data$omy05)
+str(Data$tank)
+str(Data$Date)
+str(Data$Time)
+str(Data$DateTime)
+str(Data$BurstScore)
+str(Data$Swimstyle)
+str(Data$Season)
+str(Data$Light)
+str(Data$feeders)
+str(Data$DayLength)
+str(Data$MeasNB)
+
+ggplot(Data, aes(x = MeasNB, y = log(VAR))) +
+  geom_boxplot() +
+  theme_minimal()
 
 
 PhysioActData <- Data%>%  
-  group_by(Biologger) %>%
+  group_by(#Light,
+    Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
+    mean_corrAvgEA = mean(corr.AvgEA, na.rm = TRUE),
     mean_MaxEA = mean(MaxEA, na.rm = TRUE),
+    MaxEA = max(MaxEA, na.rm = TRUE),
     mean_VAR = mean(VAR, na.rm = TRUE),
     count_BurstScore = sum(BurstScore, na.rm = TRUE),
     logBurstScore = as.numeric(log(count_BurstScore)),
     BurstProp = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
     WeightFeb = first(WeightFeb),
-    WeightMay = first(WeightMayDXA),
+    WeightMay = first(WeightMay),
     LengthFeb = first(LengthFeb),
     LengthMay = first(LengthMay),
     FultonFeb = first(FultonFeb),
@@ -142,15 +210,13 @@ PhysioActData <- Data%>%
     fatpercent = first(fatpercent),
     fatmass = first(fatmass),
     leanmass = first(leanmass),
-    logFM = as.numeric(log(fatmass)),
-    logLM = as.numeric(log(leanmass))
   )%>%  
   filter(
-    Biologger != "UXL0552DAT",
-    Biologger != "UXL0550DAT",
-    Biologger != "UXL0500DAT",
-    Biologger != "UXL0442DAT",
-    Biologger != "UXL0438DAT",
+    Biologger != "UXL0552DAT",#|
+    Biologger != "UXL0550DAT",#|
+    Biologger != "UXL0500DAT",#|--  Loggers lacking some physiological data 
+    Biologger != "UXL0442DAT",#|
+    Biologger != "UXL0438DAT",#|
   ) %>%
   mutate(
     greb1l = as.factor(greb1l),
@@ -160,6 +226,22 @@ PhysioActData <- Data%>%
     Biologger = as.factor(Biologger),
   )
 
+PhysioActDayta <- PhysioActData %>%
+  filter(
+    Light == "Day"
+  )
+
+PhysioActNight <- PhysioActData %>%
+  filter(
+    Light == "Night"
+  )
+
+
+ggplot(
+  data = `PhysioActData`, 
+  mapping = aes(x = Light, y = mean_MaxEA, fill=food)
+) +
+  geom_boxplot()
 
 
 str(PhysioActData$Biologger)
@@ -172,23 +254,55 @@ str(PhysioActData$Time)
 str(PhysioActData$DateTime)
 str(PhysioActData$BurstScore)
 str(PhysioActData$Swimstyle)
-str(PhysioActData$Tempgroup)
+str(PhysioActData$Season)
+
+
+## test if greb, food or activity affects lean mass
+
+leanm_burst  <- lme(leanmass ~ BurstProp,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+leanm_var    <- lme(leanmass ~ mean_VAR,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
+leanm_avgEA  <- lme(leanmass ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+leanm_maxEA  <- lme(leanmass ~ mean_MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+leanm_corrAvgEA  <- lme(leanmass ~ mean_corrAvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+leanm_MaxEA  <- lme(leanmass ~ MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+
+AIC(leanm_burst, leanm_var, leanm_avgEA, leanm_maxEA, leanm_corrAvgEA, leanm_MaxEA)
 
 
 
+Modellean <- lme(leanmass ~ log(mean_MaxEA)*greb1l+food, #<= BEST MODEL
+                 method="ML",
+                 random=list(fam=~1, tank=~1),
+                 data = PhysioActData)
+
+performance(Modellean)
+
+hist(resid(Modellean))
+qqPlot(resid(Modellean))
+summary(Modellean)
+anova(Modellean)
+
+predict.Modellean <- ggpredict(Modellean, terms = c("mean_MaxEA", "greb1l","food"), ci.lvl = 0.95)
+plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF", "skyblue2"), line_size = 1.5)
 
 
+ggplot(
+  data = PhysioActDayta, 
+  mapping = aes(x = mean_MaxEA, y = leanmass, col=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_point()+
+  geom_smooth()
 
 
-
-## check if fat mass correlates with body size (lean mass)
+## fat mass correlates with body size (lean mass)
 
 
 ModelFat <- lmer(logFM ~ logLM + fam + (1 | tank),
-                 data = PhysioActData)
+                 data = PhysioActDayta)
 
 
-ModelFat <- lme(logFM ~ logLM,
+ModelFat <- lme(log(fatmass) ~ log(leanmass),
              method = "REML",
              random = list(tank=~1, fam=~1),
               data = PhysioActData)
@@ -197,65 +311,32 @@ hist(resid(ModelFat))
 qqPlot(resid(ModelFat))
 summary(ModelFat)
 anova(ModelFat)
-
+PhysioActData$resid_fat <- resid(ModelFat)
 
 ggplot(
-  data = `PhysioActData`, 
-  mapping = aes(x = leanmass, y = fatmass, col=food)
+  data = `PhysioActDayta`, 
+  mapping = aes(x = log(leanmass), y = log(fatmass), col=food)
 ) +
   geom_point()+
   geom_smooth(method=lm)
 
-predict.ModelFat <- ggpredict(ModelFat, terms = c("logLM", "food"), ci.lvl = 0.95)
+predict.ModelFat <- ggpredict(ModelFat, terms = c("leanmass"), ci.lvl = 0.95)
 plot(predict.ModelFat, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 
 
-leanm_burst  <- lme(leanmass ~ count_BurstScore,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_var    <- lme(leanmass ~ mean_VAR,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_avgEA  <- lme(leanmass ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_maxEA  <- lme(leanmass ~ mean_MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-
-AIC(leanm_burst, leanm_var, leanm_avgEA, leanm_maxEA)
-
-
-
-Modellean <- lme(logLM ~ log(WeightFeb)*food,
-                method="ML",
-                random=list(fam=~1, tank=~1),
-                data = PhysioActData)
-
-
-hist(resid(Modellean))
-qqPlot(resid(Modellean))
-summary(Modellean)
-anova(Modellean)
-
-predict.Modellean <- ggpredict(Modellean, terms = c("mean_MaxEA","greb1l","food"), ci.lvl = 0.95)
-plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF", "skyblue2"), line_size = 1.5)
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = log(WeightFeb), y = logLM, col=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)
-
 
 fatm_burst  <- lme(logFM ~ count_BurstScore,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
 fatm_var    <- lme(logFM ~ mean_VAR,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-fatm_avgEA  <- lme(logFM ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+fatm_avgEA  <- lme(logFM ~ mean_corrAvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
 fatm_maxEA  <- lme(logFM ~ mean_MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
 
 AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
 
 
 
-ModelFatAct <- lme(log(fatpercent) ~ logLM + log(count_BurstScore),
-                   method="ML",
-                   random=list(fam=~1, tank=~1),
+ModelFatAct <- glmmTMB(resid_fat+1 ~ food + (1|fam)+ (1|tank),
+                   family = gaussian(),
                    data = PhysioActData)
 
 
@@ -266,21 +347,26 @@ anova(ModelFatAct)
 dd<- dredge(ModelFatAct, fixed = "logLM")
 
 
-predict.ModelFatAct <- ggpredict(ModelFatAct, terms = c("logLM", "food"), ci.lvl = 0.95)
+predict.ModelFatAct <- ggpredict(ModelFatAct, terms = c("MaxEA"), ci.lvl = 0.95)
 plot(predict.ModelFatAct, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 
+ggplot(
+  data = PhysioActDayta, 
+  mapping = aes(x = MaxEA, y = leanmass, col=greb1l)
+) +
+  geom_point()+
+  geom_smooth(method=lm)
 
 
 
 
 
 
-
-Fultonm_burst  <- lme(PercentDeltaFulton ~ count_BurstScore,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_var    <- lme(PercentDeltaFulton ~ BurstProp,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_avgEA  <- lme(PercentDeltaFulton ~ log(count_BurstScore),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_maxEA  <- lme(PercentDeltaFulton ~ log(BurstProp),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+Fultonm_burst  <- lme(PercentDeltaFulton ~ log(BurstProp),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+Fultonm_var    <- lme(PercentDeltaFulton ~ log(mean_VAR),    random = list(fam = ~1, tank = ~1), data = PhysioActData)
+Fultonm_avgEA  <- lme(PercentDeltaFulton ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
+Fultonm_maxEA  <- lme(PercentDeltaFulton ~ log(mean_MaxEA),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
 
 AIC(Fultonm_burst, Fultonm_var, Fultonm_avgEA, Fultonm_maxEA)
 

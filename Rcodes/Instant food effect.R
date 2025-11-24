@@ -60,6 +60,7 @@ Full_Data_Out <- Full_Data_Out %>%
     LogAvgEA = as.numeric(log10(`AvgEA`+0.001)),
     LogMaxEA = as.numeric(log10(`MaxEA`+0.001)),
     LogVAR = as.numeric(log10(VAR+0.76)),
+    corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
   )
 
 ##Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
@@ -137,9 +138,10 @@ middayfooddata <- comparefooddata %>%
 
 
 FoodBurst <- middayfooddata%>%  
-  group_by(food, Tempgroup, daytime, start_type, fasting, Biologger) %>%
+  group_by(Light, food, Tempgroup, daytime, start_type, fasting, Biologger) %>%
   summarise(
     mean_BurstScore = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
+    mean_corr.AvgEA = mean(corr.AvgEA),
     Biologger = first(Biologger),
     greb1l = first(greb1l),
     food = first(food),
@@ -150,7 +152,7 @@ FoodBurst <- middayfooddata%>%
   )
 
 
-Fasting <- lme(mean_BurstScore ~  daytime*start_type*food*Tempgroup, ##best model
+Fasting <- lme(mean_corr.AvgEA ~ Light*daytime*start_type*food*Tempgroup, ##best model
                      method="ML",
                      random=list(fam=~1, tank=~1),
                      data = FoodBurst)
@@ -169,9 +171,9 @@ pairs(EMM_resp, adjust="none")
 
 ggplot(
   data = FoodBurst, 
-  mapping = aes(x = Tempgroup, y = mean_BurstScore, color=start_type),
+  mapping = aes(x = Tempgroup, y = mean_corr.AvgEA, color=start_type),
 ) +
-  facet_wrap(~daytime+food)+
+  facet_wrap(~daytime+food+Light)+
   geom_boxplot()
 
 ggplot(

@@ -67,7 +67,7 @@ Full_Data <- read_xlsx(paste0(path.data, "Biologger full data.xlsx"))
 ##UXL0557DAT is one of the loggers that was eaten
 ##Data after 13 may is not reliable (culling going on, fish disturbed)
 ##UXL0530, 532, 533 and 511DAT showed a drift in acceleration values (could be added back if Asgeir can correct the values)
-##Filter out the data points with sampling frequency = 2spm : those with both skew = 0 and kurt = -2
+##Filter out the data points with sampling frequency = 2spm : those with both skew = 0 and kurt = -2 or skew = 0 and kurt = 0
 
 Full_Data_Clean <- Full_Data %>%
   filter(
