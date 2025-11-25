@@ -31,7 +31,7 @@ library(glmmTMB)
 library(performance)
 library(flexmix)
 library(mclust)
-
+ 
 source("path_file_lilian.R")
   
 Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger Clean data.xlsx"))
@@ -250,35 +250,52 @@ Full_Data_Out <- Full_Data_Out %>%
 
 ### First run a glmm on the whole data
 
-F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank), ## <= Best model ?
+F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+ (1 | Biologger) + (1| tank) + (1|fam), ## <= Tank and fam as random explain too little variance, drop them
               family = tweedie(link="log"), 
               data = Full_Data_Out)
+performance(F1)
+#=> No cond. R" values because fam and tank variances are too low
+summary(F1) 
 
 
-Full_Data_Day <- Full_Data_Out%>%
-  filter(
-    Light == "Day",
-  )
-
-F1 <- glmmTMB(log(AvgEA) ~ Tempgroup*food*greb1l + (1 | Biologger)+ (1 | tank)+ (1 | fam), ## <= Best model ?
-              family = tweedie(link="log"), 
-              data = Full_Data_Day)
-
+ 
+F1.1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biologger), ## <= Best model for full data
+                family = tweedie(link="log"), 
+                data = Full_Data_Out)
 
 # R^2
-performance(F1) # gives KPIs, but hard to decide what is okay or not...
-## R2 values are not great... most of the variability is ICC
-summary(F1)
+performance(F1.1) # gives KPIs, but hard to decide what is okay or not...
+## marg. R2 values are not great... most of the variability is ICC (= fish-specific baseline)
+summary(F1.1) 
 
+### Then, analyse day and night separately
 Full_Data_Day <- Full_Data_Out %>% 
   filter(
     Light == "Day"
     )
 
-F1 <- glmmTMB(log(AvgEA) ~ Tempgroup*food*greb1l + (1 | Biologger), ## <= Best model ?
+F2 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model ?
               family = tweedie(link="log"), 
               data = Full_Data_Day)
+# R^2
+performance(F2) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F2)
 
+
+
+Full_Data_Night <- Full_Data_Out %>% 
+  filter(
+    Light == "Night"
+  )
+
+F3 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food*greb1l + fam + (1 | Biologger), ## <= Best model ?
+              family = tweedie(link="log"), 
+              data = Full_Data_Night)
+# R^2
+performance(F3) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F3)
 
 
 
@@ -287,14 +304,14 @@ EMM_resp1 <- regrid(EMM1)
 pairs(EMM_resp1)
 
 
-F2 <- glmmTMB(log(MaxEA) ~ LengthFeb:food + Light*Tempgroup*food*greb1l + (1 | Biologger), ## <= Best model ?
+F4 <- glmmTMB(log(MaxEA) ~ Light*Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model ?
               family = tweedie(link="log"), 
               data = Full_Data_Out)
 
 # R^2
-performance(F2) # gives KPIs, but hard to decide what is okay or not...
+performance(F4) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
-summary(F2)
+summary(F4)
 
 
 
@@ -302,9 +319,9 @@ EMM2 <- emmeans(F2, ~greb1l:food:Light, data=Full_Data_Out)
 EMM_resp2 <- regrid(EMM2)
 pairs(EMM_resp2, adjust="none")
 
-
+0
 # Get scaled quantile residuals.
-F1Bernqr <- simulateResiduals(fittedModel = F1, plot = FALSE)
+F1Bernqr <- simulateResiduals(fittedModel = F1.1, plot = FALSE)
 
 #' Plot the scaled quantile residuals versus each covariate.
 #' Tempgroup
@@ -327,10 +344,10 @@ plotResiduals(F1Bernqr,
               xlab = "greb1l") 
 
 
-#' TimeToNoon
+#' Light
 plotResiduals(F1Bernqr, 
               quantreg = FALSE,
-              form = Full_Data_Out$TimeToNoon, 
+              form = Full_Data_Out$Light, 
               xlab = "Light") 
 
 
