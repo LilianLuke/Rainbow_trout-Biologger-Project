@@ -253,9 +253,9 @@ Full_Data_Out <- Full_Data_Out %>%
 F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+ (1 | Biologger) + (1| tank) + (1|fam), ## <= Tank and fam as random explain too little variance, drop them
               family = tweedie(link="log"), 
               data = Full_Data_Out)
-performance(F1)
+#performance(F1)
 #=> No cond. R" values because fam and tank variances are too low
-summary(F1) 
+summary(F1) # no p-values, not sure why, but removing tank and fam from randoms solve the issue
 
 
  
@@ -264,9 +264,22 @@ F1.1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biologger), 
                 data = Full_Data_Out)
 
 # R^2
-performance(F1.1) # gives KPIs, but hard to decide what is okay or not...
+#performance(F1.1) # gives KPIs, but hard to decide what is okay or not...
 ## marg. R2 values are not great... most of the variability is ICC (= fish-specific baseline)
 summary(F1.1) 
+
+
+F1.2 <- glmmTMB(log(corr.AvgEA+1) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biologger), ## <= Best model for full data
+                family = tweedie(link="log"), 
+                data = Full_Data_Out)
+
+# R^2
+#performance(F1.2) # gives KPIs, but hard to decide what is okay or not...
+## marg. R2 values are not great... most of the variability is ICC (= fish-specific baseline)
+summary(F1.2) 
+
+
+
 
 ### Then, analyse day and night separately
 Full_Data_Day <- Full_Data_Out %>% 
@@ -274,13 +287,21 @@ Full_Data_Day <- Full_Data_Out %>%
     Light == "Day"
     )
 
-F2 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model ?
+F2.1 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food + fam + (1 | Biologger), ## <= Best model 
               family = tweedie(link="log"), 
               data = Full_Data_Day)
 # R^2
-performance(F2) # gives KPIs, but hard to decide what is okay or not...
+#performance(F2.1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
-summary(F2)
+summary(F2.1)
+
+ggplot(Full_Data_Day, aes(x = Tempgroup, y = log(corr.AvgEA+1), fill=food)) +
+  geom_boxplot()+
+  stat_summary(aes(col=food))
+
+EMMF2 <- emmeans(F2, ~Tempgroup:food, data=Full_Data_Out) 
+EMM_respF2 <- regrid(EMMF2)
+pairs(EMM_respF2)
 
 
 
@@ -289,29 +310,102 @@ Full_Data_Night <- Full_Data_Out %>%
     Light == "Night"
   )
 
-F3 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food*greb1l + fam + (1 | Biologger), ## <= Best model ?
+F2.2 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*(food+greb1l) + fam + (1 | Biologger), ## <= Best model 
               family = tweedie(link="log"), 
               data = Full_Data_Night)
 # R^2
-performance(F3) # gives KPIs, but hard to decide what is okay or not...
+#performance(F2.2) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F2.2)
+
+ggplot(Full_Data_Night, aes(x = food, y = corr.AvgEA, col=greb1l)) +
+  facet_wrap(~Tempgroup)+
+  stat_summary() 
+
+
+EMMF3 <- emmeans(F3, ~Tempgroup:(food+greb1l), data=Full_Data_Out) 
+EMM_respF3 <- regrid(EMMF3)
+pairs(EMM_respF3)
+
+
+F3 <- glmmTMB(log(MaxEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | fam), ## <= Best model
+              family = tweedie(link="log"), 
+              data = Full_Data_Out)
+
+ggplot(Full_Data_Day, aes(x = food, y = log(MaxEA), fill=greb1l)) +
+  facet_wrap(~Tempgroup)+
+  geom_boxplot()+
+  stat_summary(aes(col=greb1l))
+
+
+# R^2
+#performance(F3) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
 summary(F3)
 
 
-
-EMM1 <- emmeans(F1, ~greb1l:food:Light, data=Full_Data_Out) 
-EMM_resp1 <- regrid(EMM1)
-pairs(EMM_resp1)
-
-
-F4 <- glmmTMB(log(MaxEA) ~ Light*Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model ?
+F3.1 <- glmmTMB(log(MaxEA) ~ Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model
               family = tweedie(link="log"), 
-              data = Full_Data_Out)
-
+              data = Full_Data_Day)
 # R^2
-performance(F4) # gives KPIs, but hard to decide what is okay or not...
+performance(F3.1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
-summary(F4)
+summary(F3.1)
+
+F3.2 <- glmmTMB(log(MaxEA) ~ Tempgroup*food+ fam + (1 | Biologger), ## <= Best model
+              family = tweedie(link="log"), 
+              data = Full_Data_Night)
+# R^2
+performance(F3.2) # gives KPIs, but hard to decide what is okay or not...
+## R2 values are not great... most of the variability is ICC
+summary(F3.2)
+
+
+
+F4TEST <- glmmTMB(log(MaxEA) ~ Tempgroup*food*greb1l+ (1 | Biologger), ## <= Best model
+              family = tweedie(link="log"), 
+              data = Full_Data_Day)
+
+
+
+predict.Max <- ggpredict(F4TEST, terms = c("Light", "Tempgroup","food","greb1l"), ci.lvl = 0.95)
+
+
+predict.Max$x <- dplyr::recode(predict.Max$x, "LowTemp" = "Winter",  "HighTemp" = "Spring")
+predict.Max$group <- dplyr::recode(predict.Max$group, "high-food" = "High Food",  "low-food" = "Low Food")
+predict.Max$facet <- dplyr::recode(predict.Max$facet, "Allele 1" = "Summer",  "Allele 2" = "Winter")
+colnames(predict.Max)[6] <- "Food"
+colnames(predict.Max)[7] <- "greb1l"
+
+burst.plot <- ggplot(predict.Max, aes(y= predicted, x=x, group = greb1l))+
+  facet_grid(~Food)+
+  geom_point(position = position_dodge(.4), size= 6, aes(col=greb1l))+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high, col=greb1l), position = position_dodge(.4),
+                width=0.3) +
+  scale_color_manual(values = c("gold2", "royalblue"))+
+  xlab(expression(bold("Temperature")))+
+  ylab(expression(bold("Predicted proportion of burst swimming (95% C.I.)")))+
+  ylim(c(0, 6))+
+  theme_bw()+
+  theme(panel.spacing.x=unit(0, "lines"),
+        plot.title = element_text(size =18),
+        plot.subtitle =  element_text(size =17),
+        axis.title.y = element_text(size = 18),
+        axis.title.x = element_text(size = 18),
+        axis.text.y = element_text(size=16),
+        axis.text.x = element_text(size=15, vjust=0.6),
+        panel.grid.minor =element_blank(),
+        panel.grid.major=element_blank(),
+        strip.text.x = element_text(size = 18, face="italic"),
+        legend.position = c(0.1, 0.9) ,
+        legend.box.spacing = unit(0, "lines"),
+        legend.text = element_text(size = 17),
+        legend.title = element_text(size = 17, face="italic")
+  )
+
+burst.plot
+
+
 
 
 

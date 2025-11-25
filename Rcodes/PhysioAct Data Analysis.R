@@ -297,11 +297,6 @@ ggplot(
 
 ## fat mass correlates with body size (lean mass)
 
-
-ModelFat <- lmer(logFM ~ logLM + fam + (1 | tank),
-                 data = PhysioActDayta)
-
-
 ModelFat <- lme(log(fatmass) ~ log(leanmass),
              method = "REML",
              random = list(tank=~1, fam=~1),
@@ -335,7 +330,7 @@ AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
 
 
 
-ModelFatAct <- glmmTMB(resid_fat+1 ~ food + (1|fam)+ (1|tank),
+ModelFatAct <- glmmTMB(resid_fat+1 ~ food + (1|fam)+ (1|tank), # <= Best Model 
                    family = gaussian(),
                    data = PhysioActData)
 
@@ -347,16 +342,11 @@ anova(ModelFatAct)
 dd<- dredge(ModelFatAct, fixed = "logLM")
 
 
-predict.ModelFatAct <- ggpredict(ModelFatAct, terms = c("MaxEA"), ci.lvl = 0.95)
-plot(predict.ModelFatAct, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
-
-
 ggplot(
-  data = PhysioActDayta, 
-  mapping = aes(x = MaxEA, y = leanmass, col=greb1l)
+  data = PhysioActData, 
+  mapping = aes(x = food, y = resid_fat , col=greb1l)
 ) +
-  geom_point()+
-  geom_smooth(method=lm)
+  geom_boxplot()
 
 
 
