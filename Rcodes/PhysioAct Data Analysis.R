@@ -330,7 +330,7 @@ AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
 
 
 
-ModelFatAct <- glmmTMB(resid_fat+1 ~ food + (1|fam)+ (1|tank), # <= Best Model 
+ModelFatAct <- glmmTMB(resid_fat+1 ~ food*greb1l + (1|fam)+ (1|tank), # <= Best Model 
                    family = gaussian(),
                    data = PhysioActData)
 
@@ -338,15 +338,13 @@ ModelFatAct <- glmmTMB(resid_fat+1 ~ food + (1|fam)+ (1|tank), # <= Best Model
 hist(resid(ModelFatAct))
 qqPlot(resid(ModelFatAct))
 summary(ModelFatAct)
-anova(ModelFatAct)
-dd<- dredge(ModelFatAct, fixed = "logLM")
-
 
 ggplot(
   data = PhysioActData, 
-  mapping = aes(x = food, y = resid_fat , col=greb1l)
+  mapping = aes(x = food, y = resid_fat , fill=greb1l)
 ) +
-  geom_boxplot()
+  geom_violin()
+### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group
 
 
 
