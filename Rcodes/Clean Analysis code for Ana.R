@@ -148,7 +148,7 @@ AIC(GAMMAvg1, GAMMAvg2)  ##AIC GAMMAvg1<GAMMAvg2, keep factor smooth interaction
 summary(GAMMAvg1)
 
 ## The low-food smooth are both different than the reference (here, high food + allele 1)
-## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ
+## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they significantly differ
 
 
 

@@ -27,6 +27,10 @@ library(emmeans)
 library(tools)
 library(ggeffects)
 
+
+
+source("path_file_lilian.R")
+
 Full_Data_Clean <- read_xlsx("C:/Users/03278487/OneDrive - Valtion/General - ThermoEvo/Lilian data/R outputs/Biologgers data/Biologger Clean data.xlsx") 
 
 
