@@ -46,16 +46,13 @@ Full_Data_Out <- Full_Data_Clean %>%
     fam = as.factor(fam),
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
+    Season = as.factor(Season),
   ) %>%
   ## Convert Date and Time back to a format that can be plotted correctly
   mutate(
     Date = ymd(Date),
     Time = hms(Time),
-  )%>%
-  filter (
-    !AvgEA == MaxEA, ### Removes all the data point with 2spm (we only use those with 60spm)
   )
-
 
 
 ### make sure all covariates are considered correctly
@@ -68,17 +65,9 @@ str(Full_Data_Out$tank)
 str(Full_Data_Out$Date)
 str(Full_Data_Out$Time)
 str(Full_Data_Out$DateTime)
+str(Full_Data_Out$Season)
 
 
-
-### Create a log column for each ACT parameter to be able to run GAMMS on it
-Full_Data_Out <- Full_Data_Out %>%
-  group_by(Biologger) %>%
-  mutate(
-    LogAvgEA = as.numeric(log10(`AvgEA`+0.001)),
-    LogMaxEA = as.numeric(log10(`MaxEA`+0.001)),
-    LogVAR = as.numeric(log10(VAR+0.76)),
-  )
 
 ### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
@@ -101,11 +90,9 @@ Full_Data_Out <- Full_Data_Out %>%
       "HighTemp"
     )),
     corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
-    corr.VAR = as.numeric(VAR-(MaxEA-(MaxEA/60))^2/60),
-    th.VAR = as.numeric(((MaxEA-(10))^2+59*(0-(10))^2)/60),
   ) %>%
   filter(
-    Biologger != "UXL0471DAT",
+    Biologger != "UXL0471DAT", #weird results + infected fish
   )
 
 str(Full_Data_Out$BurstScore)
@@ -231,7 +218,7 @@ str(Full_Data_Out$feeders)
 str(Full_Data_Out$DayLength)
 
 Full_Data_Out$Light <- factor(Full_Data_Out$Light, levels = c("Night", "Day"))
-
+Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
 
 Full_Data_Out <- Full_Data_Out %>% 
   mutate(
@@ -250,23 +237,21 @@ Full_Data_Out <- Full_Data_Out %>%
 
 ### First run a glmm on the whole data
 
-F1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+ (1 | Biologger) + (1| tank) + (1|fam), ## <= Tank and fam as random explain too little variance, drop them
-              family = tweedie(link="log"), 
+F1 <- glmmTMB(AvgEA ~ Light+Season*food*greb1l+ (1 | tank/Biologger), ## <= Tank and fam as random explain too little variance, drop them
+              family = Gamma(link="log"), 
               data = Full_Data_Out)
 #performance(F1)
-#=> No cond. R" values because fam and tank variances are too low
-summary(F1) # no p-values, not sure why, but removing tank and fam from randoms solve the issue
+summary(F1)
+
+predict.AvgF1 <- ggpredict(F1, terms = c("Light", "Season", "food","greb1l"))
 
 
- 
-F1.1 <- glmmTMB(log(AvgEA) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biologger), ## <= Best model for full data
-                family = tweedie(link="log"), 
-                data = Full_Data_Out)
+ggplot(predict.AvgF1, aes(y= predicted, x=x, col= facet))+
+  facet_wrap(~group)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
 
-# R^2
-#performance(F1.1) # gives KPIs, but hard to decide what is okay or not...
-## marg. R2 values are not great... most of the variability is ICC (= fish-specific baseline)
-summary(F1.1) 
+
 
 
 F1.2 <- glmmTMB(log(corr.AvgEA+1) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biologger), ## <= Best model for full data
@@ -278,21 +263,26 @@ F1.2 <- glmmTMB(log(corr.AvgEA+1) ~ Light*Tempgroup*food*greb1l+fam + (1 | Biolo
 ## marg. R2 values are not great... most of the variability is ICC (= fish-specific baseline)
 summary(F1.2) 
 
-
-
-
-### Then, analyse day and night separately
-Full_Data_Day <- Full_Data_Out %>% 
+Full_Data_Winter <- Full_Data_Out %>% 
   filter(
-    Light == "Day"
-    )
+    Season == "Winter"
+  )
 
-F2.1 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*food + fam + (1 | Biologger), ## <= Best model 
-              family = tweedie(link="log"), 
-              data = Full_Data_Day)
-# R^2
-#performance(F2.1) # gives KPIs, but hard to decide what is okay or not...
-## R2 values are not great... most of the variability is ICC
+Full_Data_Spring <- Full_Data_Out %>% 
+  filter(
+    Season == "Spring"
+  )
+
+
+F2 <- glmmTMB(AvgEA ~ Light+Season*food+greb1l + (1 | tank/Biologger), 
+                family = Gamma(link="log"), 
+                data = Full_Data_Out)
+summary(F2)
+
+F2.1 <- glmmTMB(AvgEA ~ Light+food*greb1l + (1 | tank/Biologger),
+              family = Gamma(link = "log"), 
+              data = Full_Data_Winter)
+#performance(F2.)
 summary(F2.1)
 
 ggplot(Full_Data_Day, aes(x = Tempgroup, y = log(corr.AvgEA+1), fill=food)) +
@@ -305,34 +295,44 @@ pairs(EMM_respF2)
 
 
 
-Full_Data_Night <- Full_Data_Out %>% 
-  filter(
-    Light == "Night"
-  )
 
-F2.2 <- glmmTMB(log(corr.AvgEA+1) ~ Tempgroup*(food+greb1l) + fam + (1 | Biologger), ## <= Best model 
-              family = tweedie(link="log"), 
-              data = Full_Data_Night)
-# R^2
-#performance(F2.2) # gives KPIs, but hard to decide what is okay or not...
-## R2 values are not great... most of the variability is ICC
+F2.2 <- glmmTMB(AvgEA ~ Light+food*greb1l + (1 | tank/Biologger),
+              family = Gamma(link = "log"), 
+              data = Full_Data_Spring)
+#performance(F2.2)
 summary(F2.2)
 
-ggplot(Full_Data_Night, aes(x = food, y = corr.AvgEA, col=greb1l)) +
-  facet_wrap(~Tempgroup)+
-  stat_summary() 
+r2 <- r.squaredGLMM(F2.2)
+r2c <- r2[1, "R2c"]
 
 
-EMMF3 <- emmeans(F3, ~Tempgroup:(food+greb1l), data=Full_Data_Out) 
-EMM_respF3 <- regrid(EMMF3)
-pairs(EMM_respF3)
+ggplot(Full_Data_Out, aes(x = Light, y = log(AvgEA)))+
+  facet_wrap(~Season)+
+  geom_boxplot()
+
+predict.Avg <- ggpredict(F2.1, terms = c("Light", "food","greb1l"))
 
 
-F3 <- glmmTMB(log(MaxEA) ~ Light*Tempgroup*food*greb1l + (1 | Biologger)+ (1 | fam), ## <= Best model
+ggplot(predict.Avg, aes(y= predicted, x=x, col= facet))+
+  facet_wrap(~group)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+ggplot(Full_Data_Out, aes(y= Temp, x=Date))+
+  geom_point()+
+  geom_smooth()
+
+EMMF2 <- emmeans(F2, ~greb1l*food, by = "Light", data=Full_Data) 
+
+EMM_respF2 <- regrid(EMMF2)
+pairs(EMM_respF2, adjust="none")
+
+
+F3 <- glmmTMB(log(MaxEA) ~ Light*food*greb1l + fam + (1 | Biologger) + (1 | tank), ## <= Best model
               family = tweedie(link="log"), 
-              data = Full_Data_Out)
+              data = Full_Data)
 
-ggplot(Full_Data_Day, aes(x = food, y = log(MaxEA), fill=greb1l)) +
+ ggplot(Full_Data_Day, aes(x = food, y = log(MaxEA), fill=greb1l)) +
   facet_wrap(~Tempgroup)+
   geom_boxplot()+
   stat_summary(aes(col=greb1l))
@@ -344,27 +344,72 @@ ggplot(Full_Data_Day, aes(x = food, y = log(MaxEA), fill=greb1l)) +
 summary(F3)
 
 
-F3.1 <- glmmTMB(log(MaxEA) ~ Tempgroup*food*greb1l+ fam + (1 | Biologger), ## <= Best model
+F3.1 <- glmmTMB(log(MaxEA) ~ Light*food*greb1l+ fam + (1 | Biologger) + (1 | tank), #<= BEST MODEL
               family = tweedie(link="log"), 
-              data = Full_Data_Day)
+              data = Full_Data_Spring)
 # R^2
-performance(F3.1) # gives KPIs, but hard to decide what is okay or not...
+#performance(F3.1) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
 summary(F3.1)
 
-F3.2 <- glmmTMB(log(MaxEA) ~ Tempgroup*food+ fam + (1 | Biologger), ## <= Best model
+F3.2 <- glmmTMB(log(MaxEA) ~ Light*(food+greb1l) + fam + (1 | tank) + (1 | Biologger), 
               family = tweedie(link="log"), 
-              data = Full_Data_Night)
+              data = Full_Data_Winter)
 # R^2
-performance(F3.2) # gives KPIs, but hard to decide what is okay or not...
+#performance(F3.2) # gives KPIs, but hard to decide what is okay or not...
 ## R2 values are not great... most of the variability is ICC
 summary(F3.2)
 
 
+predict.Max <- ggpredict(F3.1, terms = c("Light", "food","greb1l"))
 
-F4TEST <- glmmTMB(log(MaxEA) ~ Tempgroup*food*greb1l+ (1 | Biologger), ## <= Best model
-              family = tweedie(link="log"), 
-              data = Full_Data_Day)
+
+ggplot(predict.Avg, aes(y= predicted, x=x, col= facet))+
+  facet_wrap(~group)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -668,10 +713,10 @@ performance(D3) # gives KPIs, but hard to decide what is okay or not...
 summary(D3)
 
 
-sapply(DynamicData[c("fam","Biologger","tank")], function(x) length(unique(x)))
-table(DynamicData$fam)     # voir si certains niveaux n'ont qu'1 obs
-table(DynamicData$Biologger)
-table(DynamicData$tank)
+sapply(Full_Data_Out[c("Season","Biologger","tank")], function(x) length(unique(x)))
+table(Full_Data_Out$Season)     # voir si certains niveaux n'ont qu'1 obs
+table(Full_Data_Out$Biologger)
+table(Full_Data_Out$tank)
 
 # tables croisées rapides
 table(DynamicData$Biologger, DynamicData$fam)[1:129, 1:3]   # aperçu

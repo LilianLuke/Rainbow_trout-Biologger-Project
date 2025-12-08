@@ -30,6 +30,8 @@ library(tools)
 library(ggeffects)
 
 
+source("path_file_lilian.R")
+
 Full_Data <- read_xlsx(paste0(path.data, "Biologger full data.xlsx"))
 
 ##Find the correct date to split data in 2 seasons
@@ -92,9 +94,9 @@ Full_Data_Clean <- Full_Data_Clean %>%
   mutate(
     Date = dmy(Date),
     Month = lubridate::month(Date, label=TRUE),
-    ##Also add a season factor, based on previous analysis
+    ##Also add a season factor, based on equinox
     Season = as.factor(if_else(
-      Date < "2025-03-14",
+      Date < "2025-03-21",
       "Winter",
       "Spring",
     )),

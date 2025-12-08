@@ -174,8 +174,15 @@ str(Data$feeders)
 str(Data$DayLength)
 str(Data$MeasNB)
 
-ggplot(Data, aes(x = MeasNB, y = log(VAR))) +
-  geom_boxplot() +
+
+Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
+
+
+
+ggplot(Data, aes(x = DayLength, y = log(VAR))) +
+  facet_wrap(~Season)+
+  geom_point() +
+  geom_smooth(method = "lm")+
   theme_minimal()
 
 
@@ -205,7 +212,7 @@ PhysioActData <- Data%>%
     SGRMass = first(SGRMass),
     LengthFeb = first(LengthFeb),
     LengthMay = first(LengthMay),
-    `Heart weight (g)` = first(`Heart weight (g)`),
+    Heartmass = first(`Heart weight (g)`),
     HtoBratio = first(HtoBratio),
     fatpercent = first(fatpercent),
     fatmass = first(fatmass),
@@ -283,7 +290,7 @@ summary(Modellean)
 anova(Modellean)
 
 predict.Modellean <- ggpredict(Modellean, terms = c("mean_MaxEA", "greb1l","food"), ci.lvl = 0.95)
-plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF", "skyblue2"), line_size = 1.5)
+plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 
 ggplot(
@@ -330,7 +337,7 @@ AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
 
 
 
-ModelFatAct <- glmmTMB(resid_fat+1 ~ food*greb1l + (1|fam)+ (1|tank), # <= Best Model 
+ModelFatAct <- glmmTMB(resid_fat ~ food + (1|fam)+ (1|tank), # <= Best Model 
                    family = gaussian(),
                    data = PhysioActData)
 
@@ -367,7 +374,7 @@ AIC(Fultonm_lean, Fultonm_fat,Fultonm_fatPer)
 
 ggplot(
   data = PhysioActData, 
-  mapping = aes(x = log(BurstProp), y = fatpercent, col=food)
+  mapping = aes(x = leanmass, y = resid_fat, col=food)
 ) +
   geom_point()+
   geom_smooth(method=lm)
@@ -375,46 +382,28 @@ ggplot(
 
 
 
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = logFM, y = PercentDeltaFulton, col=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)
-
-
-ModelFulton <- lme(PercentDeltaFulton ~ food*log(BurstProp)+greb1l,
+TestFulton <- lme(resid_fat ~ leanmass,
                    method="ML",
                    random=list(fam=~1, tank=~1),
                    data = PhysioActData)
+r2 <- r.squaredGLMM(TestFulton)
+r2c <- r2[1, "R2c"]
 
 
-hist(resid(ModelFulton))
-qqPlot(resid(ModelFulton))
-summary(ModelFulton)
-anova(ModelFulton)
-dd<- dredge(ModelFulton)
 
-
-BestModelFulton <- lme(PercentDeltaFulton ~ log(BurstProp)+food, #best model
-                       method="REML",
-                       random=list(fam=~1, tank=~1),
+BestModelFulton <- glmmTMB(PercentDeltaFulton ~ log(BurstProp)+greb1l + (1|fam) + (1| tank), #best model ?
+                       family = gaussian(),
                        data = PhysioActData)
 
-
-
 hist(resid(BestModelFulton))
-qqPlot(resid(ModeBestModelFultonlFulton))
+qqPlot(resid(BestModelFulton))
 summary(BestModelFulton)
-dd<- dredge(BestModelFulton)
-anova(BestModelFulton)
 
 r2 <- r.squaredGLMM(BestModelFulton)
 r2c <- r2[1, "R2c"]
 
 
-predict.ModelFulton <- ggpredict(BestModelFulton, terms = c("BurstProp", "food"), ci.lvl = 0.95)
+predict.ModelFulton <- ggpredict(BestModelFulton, terms = c("BurstProp"), ci.lvl = 0.95)
 plot(predict.ModelFulton, colors = c("darkgreen",  "palegreen2"), line_size = 1.5)
 
 ggplot(PhysioActData, 
@@ -456,7 +445,7 @@ ggplot(
 
 
 
-ModelHeart <- lme(log(fatpercent) ~ log(leanmass)+food*greb1l,
+ModelHeart <- lme(Heartmass ~ log(WeightMay):food,
                        method="ML",
                        random=list(fam=~1, tank=~1),
                        data = PhysioActData)
@@ -466,7 +455,7 @@ ModelHeart <- lme(log(fatpercent) ~ log(leanmass)+food*greb1l,
 hist(resid(ModelHeart))
 qqPlot(resid(ModelHeart))
 summary(ModelHeart)
-dd<- dredge(ModelHeart, fixed="fatmass")
+dd<- dredge(ModelHeart)
 anova(ModelHeart)
 
 predict.ModelHeart <- ggpredict(ModelHeart, terms = c("fatmass", "food", "greb1l"), ci.lvl = 0.95)
@@ -475,7 +464,7 @@ plot(predict.ModelHeart, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 ggplot(
   data = PhysioActData, 
-  mapping = aes(x = count_BurstScore, y = HtoBratio, col=food)
+  mapping = aes(x = WeightMay, y = Heartmass, col=food)
 ) +
   geom_point()+
   geom_smooth(method=lm)
