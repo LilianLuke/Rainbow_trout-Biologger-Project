@@ -190,7 +190,7 @@ summary(GAMMAvgHF$gam)
 
 GAMMAvgLF <- gamm(AvgEA ~ greb1l + s(Date) + s(Date, by=greb1l) + Light,
                   family = Gamma(link = "log"),
-                  random=list(tank =~1, Biologger=~1, fam=~1),
+                  random=list(fam=~1, tank =~1, Biologger=~1),
                   data = Full_Data_GAMM_LowFood)
 
 summary(GAMMAvgLF$gam)
