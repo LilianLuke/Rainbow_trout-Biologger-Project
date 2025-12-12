@@ -153,16 +153,127 @@ ggplot(
   mapping = aes(x = Month, y = Length),
 ) +
   facet_wrap(~food)+
-  geom_boxplot(aes(fill=greb1l))+
-  scale_fill_manual(values = c("gold2", "royalblue"))
+  geom_violin(aes(fill=greb1l))+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  geom_smooth(method = "lm")
 
 ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight),
 ) +
   facet_wrap(~food)+
-  geom_boxplot(aes(fill=greb1l))+
+  geom_violin(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))
 
 
+
+Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
+  mutate(
+    Month = as.factor(Month),
+    greb1l = as.factor(greb1l),
+    food = as.factor(food)
+  )
+
+
+
+
+Weight <- glmmTMB(log(Weight) ~ Month+food*greb1l+ (1 | tank/Biologger) + (1| fam),
+                      family = gaussian(), 
+                      data = Full_Meas_Data_Clean)
+
+summary(Weight)
+
+Length <- glmmTMB(log(Length) ~ Month+food*greb1l+ (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(), 
+                  data = Full_Meas_Data_Clean)
+
+summary(Length)
+
+
+
+predict.Weight <- ggpredict(Weight, terms = c("Month", "food","greb1l"))
+colnames(predict.Weight)[1] <- "Month"
+colnames(predict.Weight)[6] <- "food"
+colnames(predict.Weight)[7] <- "greb1l"
+
+ggplot(predict.Weight, aes(y= predicted, x=Month, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+
+predict.Length <- ggpredict(Length, terms = c("Month", "food","greb1l"))
+colnames(predict.Length)[1] <- "Month"
+colnames(predict.Length)[6] <- "food"
+colnames(predict.Length)[7] <- "greb1l"
+
+ggplot(predict.Length, aes(y= predicted, x=Month, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+
+## Add fulton's CF 
+
+Full_Meas_Data_Clean <- Full_Meas_Data_Clean%>%
+  mutate(
+    Fulton = as.numeric((Weight/Length^3)*100),
+  )
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Fulton),
+) +
+  facet_wrap(~food)+
+  geom_violin(aes(fill=greb1l))+
+  scale_fill_manual(values = c("gold2", "royalblue"))
+
+
+Fulton <- glmmTMB(Fulton*10 ~ Month*food*greb1l+ (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(), 
+                  data = Full_Meas_Data_Clean)
+
+summary(Fulton)
+
+
+
+predict.Fulton <- ggpredict(Fulton, terms = c("Month", "food","greb1l"))
+colnames(predict.Fulton)[1] <- "Month"
+colnames(predict.Fulton)[6] <- "food"
+colnames(predict.Fulton)[7] <- "greb1l"
+
+ggplot(predict.Fulton, aes(y= predicted, x=Month, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+
+
+
+
+
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Weight, group=Biologger),
+) +
+  facet_wrap(~food)+
+  geom_point(aes(col=greb1l))+
+  geom_path(aes(col=greb1l))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Length, group=Biologger),
+) +
+  facet_wrap(~food)+
+  geom_point(aes(col=greb1l))+
+  geom_path(aes(col=greb1l))+
+  scale_color_manual(values = c("gold2", "royalblue"))
 

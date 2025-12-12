@@ -178,6 +178,10 @@ str(Data$MeasNB)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
+ggplot(Data, aes(x = food, y = WeightFeb, fill=greb1l)) +
+  geom_boxplot()
+
+
 
 ggplot(Data, aes(x = DayLength, y = log(VAR))) +
   facet_wrap(~Season)+

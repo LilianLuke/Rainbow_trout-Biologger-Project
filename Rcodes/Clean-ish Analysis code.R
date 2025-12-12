@@ -112,11 +112,7 @@ summary(Avg3)
 
 ## Try GAMM with Date 
 
-## create food*greb1l interaction?
-
-Full_Data$food_greb <- interaction(Full_Data$food, Full_Data$greb1l)
-
-## convert Date to numeric
+## convert Date to numeric and add a food_greb column to test the interaction in gamm
 
 Full_Data_GAMM <- Full_Data %>%
   mutate(
@@ -167,13 +163,13 @@ AvgGAMM.pred <- AvgGAMM.pred %>%
 
 
 
-ggplot(data=AvgGAMM.pred, aes(y= exp(AvgEA), x=ymd(Date), col= greb1l))+
+ggplot(data=AvgGAMM.pred, aes(y= AvgEA, x=ymd(Date), col= greb1l))+
   facet_wrap(~food)+
   geom_point(alpha=.05)+
   geom_smooth()
 
 Full_Data%>% 
-  ggplot(aes(y= AvgEA, x=Date, col= greb1l))+
+  ggplot(aes(y= log(AvgEA), x=Date, col= greb1l))+
   facet_wrap(~food)+
   geom_point(alpha=.2)+
   geom_smooth()
