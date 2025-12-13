@@ -193,10 +193,11 @@ summary(Length)
 
 predict.Weight <- ggpredict(Weight, terms = c("Month", "food","greb1l"))
 colnames(predict.Weight)[1] <- "Month"
+colnames(predict.Weight)[2] <- "predicted Weight (g)"
 colnames(predict.Weight)[6] <- "food"
 colnames(predict.Weight)[7] <- "greb1l"
 
-ggplot(predict.Weight, aes(y= predicted, x=Month, col= greb1l))+
+ggplot(predict.Weight, aes(y= `predicted Weight (g)`, x=Month, col= greb1l))+
   facet_wrap(~food)+
   geom_point()+
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
@@ -205,10 +206,11 @@ ggplot(predict.Weight, aes(y= predicted, x=Month, col= greb1l))+
 
 predict.Length <- ggpredict(Length, terms = c("Month", "food","greb1l"))
 colnames(predict.Length)[1] <- "Month"
+colnames(predict.Length)[2] <- "predicted Length (cm)"
 colnames(predict.Length)[6] <- "food"
 colnames(predict.Length)[7] <- "greb1l"
 
-ggplot(predict.Length, aes(y= predicted, x=Month, col= greb1l))+
+ggplot(predict.Length, aes(y= `predicted Length (cm)`, x=Month, col= greb1l))+
   facet_wrap(~food)+
   geom_point()+
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
@@ -227,11 +229,11 @@ ggplot(
   mapping = aes(x = Month, y = Fulton),
 ) +
   facet_wrap(~food)+
-  geom_violin(aes(fill=greb1l))+
+  geom_boxplot(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))
 
 
-Fulton <- glmmTMB(Fulton*10 ~ Month*food*greb1l+ (1 | tank/Biologger) + (1| fam),
+Fulton <- glmmTMB(Fulton*10 ~ Month*food+greb1l+ (1 | tank/Biologger) + (1| fam),
                   family = gaussian(), 
                   data = Full_Meas_Data_Clean)
 
@@ -241,10 +243,11 @@ summary(Fulton)
 
 predict.Fulton <- ggpredict(Fulton, terms = c("Month", "food","greb1l"))
 colnames(predict.Fulton)[1] <- "Month"
+colnames(predict.Fulton)[2] <- "predicted Fulton"
 colnames(predict.Fulton)[6] <- "food"
 colnames(predict.Fulton)[7] <- "greb1l"
 
-ggplot(predict.Fulton, aes(y= predicted, x=Month, col= greb1l))+
+ggplot(predict.Fulton, aes(y= `predicted Fulton`, x=Month, col= greb1l))+
   facet_wrap(~food)+
   geom_point()+
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
@@ -276,4 +279,10 @@ ggplot(
   geom_point(aes(col=greb1l))+
   geom_path(aes(col=greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))
+
+
+
+
+
+
 

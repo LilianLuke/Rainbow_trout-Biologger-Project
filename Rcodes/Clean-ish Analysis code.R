@@ -133,6 +133,12 @@ GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Date, B
                   family = Gamma(link = "log"),
                   data = Full_Data_GAMM)
 
+GAMMmax1 <- bam(MaxEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Date, Biologger, bs = "fs") + s(tank, bs="re") + s(fam, bs="re") + Light,
+                family = Gamma(link = "log"),
+                data = Full_Data_GAMM)
+summary(GAMMmax1)
+s(Date, by = food_greb)
+
 GAMMAvg2 <- bam(AvgEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re") + Light,
                 family = Gamma(link = "log"),
                 data = Full_Data_GAMM)
@@ -161,12 +167,41 @@ AvgGAMM.pred <- AvgGAMM.pred %>%
     Date = as.Date(Date),
     )
 
-
-
 ggplot(data=AvgGAMM.pred, aes(y= AvgEA, x=ymd(Date), col= greb1l))+
   facet_wrap(~food)+
   geom_point(alpha=.05)+
   geom_smooth()
+
+
+MaxGAMM.pred <- predict_gam(GAMMmax1,
+                            exclude_terms = "s(Date, Biologger)",
+                            separate = list(food_greb = c("food", "greb1l"))
+) 
+
+MaxGAMM.pred <- MaxGAMM.pred %>%
+  mutate(
+    Date = as.numeric(Date),
+    food = as.factor(food),
+    greb1l = as.factor(greb1l),
+    Date = as.Date(Date),
+    Date = ymd(Date),
+  )
+
+ggplot(data=MaxGAMM.pred, aes(y= MaxEA, x=Date, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point(alpha=.05)+
+  geom_smooth()
+
+ggplot(data=Full_Data, aes(y= log(MaxEA), x=Date, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point(alpha=.05)+
+  geom_smooth()+
+  ylim(2,4)
+
+###Note : MaxEA variation is almost opposit to that of AvgEA: No difference in feb/march, but summer<winter when temp warms up
+## interpretation: allele 1 does more "bursts", when MaxEA is the same, AvgEA is higher for summer, 
+## but when temp warms up, summer fish reduce the intensity of their bursts and AvgEA then reduces to match that of winter fish
+
 
 Full_Data%>% 
   ggplot(aes(y= log(AvgEA), x=Date, col= greb1l))+

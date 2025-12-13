@@ -281,9 +281,8 @@ AIC(leanm_burst, leanm_var, leanm_avgEA, leanm_maxEA, leanm_corrAvgEA, leanm_Max
 
 
 
-Modellean <- lme(leanmass ~ log(mean_MaxEA)*greb1l+food, #<= BEST MODEL
-                 method="ML",
-                 random=list(fam=~1, tank=~1),
+Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food+ (1 | tank) + (1| fam), #<= BEST MODEL
+                 family= gaussian(),
                  data = PhysioActData)
 
 performance(Modellean)
@@ -293,17 +292,17 @@ qqPlot(resid(Modellean))
 summary(Modellean)
 anova(Modellean)
 
-predict.Modellean <- ggpredict(Modellean, terms = c("mean_MaxEA", "greb1l","food"), ci.lvl = 0.95)
+predict.Modellean <- ggpredict(Modellean, terms = c("mean_AvgEA", "food"), ci.lvl = 0.95)
 plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 
 ggplot(
-  data = PhysioActDayta, 
-  mapping = aes(x = mean_MaxEA, y = leanmass, col=greb1l)
+  data = PhysioActData, 
+  mapping = aes(x = mean_AvgEA, y = leanmass, col=greb1l)
 ) +
   facet_wrap(~food)+
   geom_point()+
-  geom_smooth()
+  geom_smooth(method = "lm")
 
 
 ## fat mass correlates with body size (lean mass)
@@ -395,7 +394,7 @@ r2c <- r2[1, "R2c"]
 
 
 
-BestModelFulton <- glmmTMB(PercentDeltaFulton ~ log(BurstProp)+greb1l + (1|fam) + (1| tank), #best model ?
+BestModelFulton <- glmmTMB(log(LengthMay) ~ log(meanAvgEA)+greb1l + (1|fam) + (1| tank), #best model ?
                        family = gaussian(),
                        data = PhysioActData)
 
