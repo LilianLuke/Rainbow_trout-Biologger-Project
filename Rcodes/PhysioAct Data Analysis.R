@@ -70,7 +70,7 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
     Date = ymd(Date),
-    Time = hms(Time),
+    Time = lubridate::hms(Time),
     BurstScore = as.numeric(BurstScore),
     Swimstyle = as.factor(Swimstyle),
     Season = as.factor(Season),
@@ -80,8 +80,8 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
     fatpercent = as.numeric(fatpercent),
     WeightMay = as.numeric(WeightMay),
     WeightMayDXA = as.numeric(WeightMayDXA),
-    NOAA_Sunrise = hms(NOAA_Sunrise),
-    NOAA_Sunset = hms(NOAA_Sunset),
+    NOAA_Sunrise = lubridate::hms(NOAA_Sunrise),
+    NOAA_Sunset = lubridate::hms(NOAA_Sunset),
     MeasNB = as.factor(MeasNB)
   )%>%
   mutate(
@@ -92,6 +92,7 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
   mutate(
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(Time),
   )
 
 
@@ -131,7 +132,7 @@ Data <- Data %>%
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
     Date = ymd(Date),
-    Time = hms::hms(Time),
+    Time = lubridate::hms(Time),
     BurstScore = as.numeric(BurstScore),
     Swimstyle = as.factor(Swimstyle),
     Season = as.factor(Season),
@@ -141,8 +142,8 @@ Data <- Data %>%
     fatpercent = as.numeric(fatpercent),
     WeightMay = as.numeric(WeightMay),
     WeightMayDXA = as.numeric(WeightMayDXA),
-    NOAA_Sunrise = hms(NOAA_Sunrise),
-    NOAA_Sunset = hms(NOAA_Sunset),
+    NOAA_Sunrise = lubridate::hms(NOAA_Sunrise),
+    NOAA_Sunset = lubridate::hms(NOAA_Sunset),
     MeasNB = as.numeric(MeasNB),
   )%>%
   mutate(
@@ -154,6 +155,7 @@ Data <- Data %>%
   mutate(
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(Time),
   )
 
 
@@ -178,20 +180,30 @@ str(Data$MeasNB)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
-ggplot(Data, aes(x = food, y = WeightFeb, fill=greb1l)) +
-  geom_boxplot()
+#ggplot(Data, aes(x = food, y = WeightFeb, fill=greb1l)) +
+#  geom_boxplot()
 
+SteadyData <- Data %>%
+  filter(
+    Swimstyle == "Steady",
+    Date > "2025-01-31",
+    Date < "2025-03-01"
+  )
 
+ActiveData <- Data %>%
+  filter(
+    Swimstyle != "Steady"
+  )
 
-ggplot(Data, aes(x = DayLength, y = log(VAR))) +
-  facet_wrap(~Season)+
-  geom_point() +
-  geom_smooth(method = "lm")+
-  theme_minimal()
+#ggplot(Data, aes(x = DayLength, y = log(VAR))) +
+#  facet_wrap(~Season)+
+#  geom_point() +
+#  geom_smooth(method = "lm")+
+#  theme_minimal()
 
 
 PhysioActData <- Data%>%  
-  group_by(#Light,
+  group_by(#MeasNB,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -200,7 +212,6 @@ PhysioActData <- Data%>%
     MaxEA = max(MaxEA, na.rm = TRUE),
     mean_VAR = mean(VAR, na.rm = TRUE),
     count_BurstScore = sum(BurstScore, na.rm = TRUE),
-    logBurstScore = as.numeric(log(count_BurstScore)),
     BurstProp = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
     WeightFeb = first(WeightFeb),
     WeightMay = first(WeightMay),
@@ -237,9 +248,9 @@ PhysioActData <- Data%>%
     Biologger = as.factor(Biologger),
   )
 
-PhysioActDayta <- PhysioActData %>%
+SteadyActLF <- SteadyActData %>%
   filter(
-    Light == "Day"
+    food == "low-food"
   )
 
 PhysioActNight <- PhysioActData %>%
@@ -249,10 +260,68 @@ PhysioActNight <- PhysioActData %>%
 
 
 ggplot(
-  data = `PhysioActData`, 
-  mapping = aes(x = Light, y = mean_MaxEA, fill=food)
+  data = SteadyActLF, 
+  mapping = aes(x = WeightFeb , y = mean_AvgEA)
 ) +
-  geom_boxplot()
+  facet_wrap(~food)+
+  geom_point(aes(col=greb1l))+
+  geom_smooth(method="lm")
+
+
+MassActData <- PhysioActData %>%
+  left_join(DataReg, by="Biologger")%>%
+  filter(
+    food=="low-food"
+  )
+
+
+  
+  
+ActBodyCorr <- glmmTMB(mean_pred.AvgEA ~ WeightFeb, #<= BEST MODEL
+                     family= gaussian(),
+                     data = MassActData)
+
+summary(ActBodyCorr)
+performance(ActBodyCorr)
+
+predict.ActBodyCorr <- ggpredict(ActBodyCorr, terms = c("WeightFeb"))
+
+ggplot(predict.ActBodyCorr, aes(y= predicted, x=x))+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+ggplot(
+  data = PhysioActData, 
+  mapping = aes(x = MeasNB , y = log(mean_AvgEA), col=greb1l, group=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_point()+
+  #geom_path(aes(group=Biologger))+
+  geom_smooth()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+ ggplot(
+  data = PhysioActData, 
+  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+ggplot(
+  data = PhysioActDayta, 
+  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
 
 
 str(PhysioActData$Biologger)

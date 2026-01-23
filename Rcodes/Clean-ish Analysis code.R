@@ -121,6 +121,7 @@ Full_Data_GAMM <- Full_Data %>%
     food_greb=as.ordered(interaction(food, greb1l)),
   )
 
+contrasts(Full_Data_GAMM$food_greb) <- "contr.treatment"
 ## apparently, bam() is better for big datasets, so try that first
 ## sources : 
 ## https://research.reading.ac.uk/psylinglab/wp-content/uploads/sites/25/2023/06/Learn-Generalised-Additive-Mixed-Models.pdf
@@ -129,7 +130,7 @@ Full_Data_GAMM <- Full_Data %>%
 
 ## I had doubt on whether I should add biologger as a random intercept  s(Biologger, bs = "re") or random smooth s(Date, Biologger, bs = "fs"), so I tried both to compare AICs
 
-GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Date, Biologger, bs = "fs") + s(tank, bs="re") + s(fam, bs="re") + Light,
+GAMMAvg1 <- bam(AvgEA ~ Light + food_greb+ s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Date, Biologger, bs = "fs", m=1)+ s(tank, bs="re") + s(fam, bs="re"),
                   family = Gamma(link = "log"),
                   data = Full_Data_GAMM)
 
@@ -154,23 +155,49 @@ summary(GAMMAvg1)
 
 
 
-AvgGAMM.pred <- predict_gam(GAMMAvg1,
-                            exclude_terms = "s(Date, Biologger)",
-                            separate = list(food_greb = c("food", "greb1l"))
-                            ) 
+AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
+
+plot(AvgGAMM.predTEST, series = "Date", comparison = "greb1l")+
+  facet_grid(~food)
+
+AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
 
 AvgGAMM.pred <- AvgGAMM.pred %>%
   mutate(
     Date = as.numeric(Date),
     food = as.factor(food),
-    greb1l = as.factor(greb1l),
+    greb1l = as.ordered(greb1l),
     Date = as.Date(Date),
-    )
+  )
 
+DataReg <- AvgGAMM.pred %>%
+  rename(pred.AvgEA = AvgEA
+  ) %>%
+  select(
+    Biologger, pred.AvgEA
+  ) %>%
+  group_by(
+    Biologger) %>%
+  summarise(
+    mean_pred.AvgEA = mean(pred.AvgEA, na.rm = TRUE))
+  
+
+AvgGAMM.pred <- AvgGAMM.pred %>%
+  dplyr::semi_join(
+    Full_Data_GAMM %>%
+      dplyr::distinct(Biologger, food, greb1l, tank, fam),
+    by = c("Biologger", "food", "greb1l", "tank", "fam")
+  ) 
+
+AvgGAMM.pred <- AvgGAMM.pred %>%
+  mutate(greb1l = as.factor(greb1l))
+  
 ggplot(data=AvgGAMM.pred, aes(y= AvgEA, x=ymd(Date), col= greb1l))+
-  facet_wrap(~food)+
-  geom_point(alpha=.05)+
-  geom_smooth()
+  facet_wrap(~food+Light)+
+  geom_point(alpha=.2)+
+  geom_smooth()+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
 
 
 MaxGAMM.pred <- predict_gam(GAMMmax1,
@@ -203,14 +230,15 @@ ggplot(data=Full_Data, aes(y= log(MaxEA), x=Date, col= greb1l))+
 ## but when temp warms up, summer fish reduce the intensity of their bursts and AvgEA then reduces to match that of winter fish
 
 
-Full_Data%>% 
-  ggplot(aes(y= log(AvgEA), x=Date, col= greb1l))+
-  facet_wrap(~food)+
-  geom_point(alpha=.2)+
-  geom_smooth()
+ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
+  facet_wrap(~food+Light)+
+#  geom_point(alpha=.2)+
+  geom_smooth(method="gam", level=0.95)+
+  scale_color_manual(values = c("gold2", "royalblue"))+
+  theme_bw()
 
 
-## Predictions are pretty much what we saw on the previous plots we made
+## Predictions are Light## Predictions are pretty much what we saw on the previous plots we made
 
 
 ## Just to make sure that there is an actual difference between allele 1 and 2 in low food, I ran gamm() separately in both food groups

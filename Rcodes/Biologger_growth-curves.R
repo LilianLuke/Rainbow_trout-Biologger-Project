@@ -162,7 +162,7 @@ ggplot(
   mapping = aes(x = Month, y = Weight),
 ) +
   facet_wrap(~food)+
-  geom_violin(aes(fill=greb1l))+
+  geom_boxplot(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))
 
 
