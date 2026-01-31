@@ -130,7 +130,7 @@ GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date, k=20) + s(Date, by = food_greb, k=20)
                   data = Full_Data_GAMM)
 
 
-GAMMAvg2 <- bam(AvgEA ~ food_greb+ s(Date, food_greb, bs="fs", k=20) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re") + Light,
+GAMMAvg2 <- bam(AvgEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re") + Light,
                 family = Gamma(link = "log"),
                 data = Full_Data_GAMM)
 
@@ -147,33 +147,35 @@ concurvity(GAMMAvg2) ##Model parameters are much better in GAMMAvg2 (less concur
 
 summary(GAMMAvg2)
 
-s(Date, by = food_greb, bs = "fs", data = Full_Data_GAMM)
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
 
+
 AvgGAMM.pred <- predict_gam(GAMMAvg2, length_out=20, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
+
+
+AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
+
+plot(AvgGAMM.predTEST, series = "Date", comparison = "greb1l")+
+  facet_grid(~food)
+
+AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
 
 AvgGAMM.pred <- AvgGAMM.pred %>%
   mutate(
     Date = as.numeric(Date),
     food = as.factor(food),
-    greb1l = as.factor(greb1l),
+    greb1l = as.ordered(greb1l),
     Date = as.Date(Date),
   )
 
-AvgGAMM.pred <- AvgGAMM.pred %>%
-  dplyr::semi_join(
-    Full_Data_GAMM %>%
-      dplyr::distinct(Biologger, food, greb1l, tank, fam),
-    by = c("Biologger", "food", "greb1l", "tank", "fam")
-  ) 
 
 ggplot(data=AvgGAMM.pred, aes(y= AvgEA, x=ymd(Date), col= greb1l))+
-  facet_wrap(~food)+
+  facet_wrap(~food+Light)+
   geom_point(alpha=.2)+
   geom_smooth()+
-  scale_color_manual(values = c("gold2", "royalblue"))+
-  theme_bw()
+  scale_color_manual(values = c("gold2", "royalblue"))
+
 
 ## Predictions are pretty much what we saw on the previous plots we made :
 
@@ -193,6 +195,33 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
         legend.text  = element_text(size = 18,face = "italic")
   )+
   labs(y="log-transformed Average EA (mg)")
+
+
+ggplot(data=MaxGAMM.pred, aes(y= MaxEA, x=Date, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point(alpha=.05)+
+  geom_smooth()
+
+ggplot(data=Full_Data, aes(y= log(MaxEA), x=Date, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point(alpha=.05)+
+  geom_smooth()+
+  ylim(2,4)
+
+###Note : MaxEA variation is almost opposit to that of AvgEA: No difference in feb/march, but summer<winter when temp warms up
+## interpretation: allele 1 does more "bursts", when MaxEA is the same, AvgEA is higher for summer, 
+## but when temp warms up, summer fish reduce the intensity of their bursts and AvgEA then reduces to match that of winter fish
+
+
+ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
+  facet_wrap(~food+Light)+
+#  geom_point(alpha=.2)+
+  geom_smooth(method="gam", level=0.95)+
+  scale_color_manual(values = c("gold2", "royalblue"))+
+  theme_bw()
+
+
+## Predictions are Light## Predictions are pretty much what we saw on the previous plots we made
 
 
 ## Just to make sure that there is an actual difference between allele 1 and 2 in low food, I ran gamm() separately in both food groups
@@ -220,8 +249,7 @@ GAMMAvgLF <- gamm(AvgEA ~ greb + s(Date) + s(Date, by=greb) + Light,
 summary(GAMMAvgLF$gam)
 
 ### Confirms results of the big model: no effect of greb alone in either case, 
-## but effect of smooth by greb in low food => what we just saw on the prediction plot
-
+## but effect of smooth by greb in low food => what we see on the plot
 
 
 

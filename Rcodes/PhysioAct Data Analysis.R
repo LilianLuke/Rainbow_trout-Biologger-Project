@@ -229,17 +229,104 @@ PhysioActData <- Data%>%
 
 PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "High Food",  "low-food" = "Low Food")
 
+SteadyActLF <- SteadyActData %>%
+  filter(
+    food == "low-food"
+  )
+
+PhysioActNight <- PhysioActData %>%
+  filter(
+    Light == "Night"
+  )
+
+
+ggplot(
+  data = SteadyActLF, 
+  mapping = aes(x = WeightFeb , y = mean_AvgEA)
+) +
+  facet_wrap(~food)+
+  geom_point(aes(col=greb1l))+
+  geom_smooth(method="lm")
+
+
+MassActData <- PhysioActData %>%
+  left_join(DataReg, by="Biologger")%>%
+  filter(
+    food=="low-food"
+  )
+
+
+  
+  
+ActBodyCorr <- glmmTMB(mean_pred.AvgEA ~ WeightFeb, #<= BEST MODEL
+                     family= gaussian(),
+                     data = MassActData)
+
+summary(ActBodyCorr)
+performance(ActBodyCorr)
+
+predict.ActBodyCorr <- ggpredict(ActBodyCorr, terms = c("WeightFeb"))
+
+ggplot(predict.ActBodyCorr, aes(y= predicted, x=x))+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
+
+ggplot(
+  data = PhysioActData, 
+  mapping = aes(x = MeasNB , y = log(mean_AvgEA), col=greb1l, group=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_point()+
+  #geom_path(aes(group=Biologger))+
+  geom_smooth()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+ ggplot(
+  data = PhysioActData, 
+  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+ggplot(
+  data = PhysioActDayta, 
+  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+
+
+str(PhysioActData$Biologger)
+str(PhysioActData$fam)
+str(PhysioActData$greb1l)
+str(PhysioActData$tank)
+str(PhysioActData$food)
+str(PhysioActData$Date)
+str(PhysioActData$Time)
+str(PhysioActData$DateTime)
+str(PhysioActData$BurstScore)
+str(PhysioActData$Swimstyle)
+str(PhysioActData$Season)
 str(PhysioActData)
 n_distinct(PhysioActData$Biologger)
 
 ## test if greb, food or activity affects lean mass
 
+
 Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
-                 family= gaussian(),
-                 data = PhysioActData)
+                     family = gaussian(),
+                     data = PhysioActData)
 
 performance(Modellean)
-
 hist(resid(Modellean))
 qqPlot(resid(Modellean))
 summary(Modellean)
@@ -248,10 +335,6 @@ ggplot(PhysioActData, aes(y= leanmass, log(mean_AvgEA), col=greb1l))+
   facet_wrap(~food)+
   geom_point()+
   geom_smooth(method="lm")
-
-predict.Modellean <- ggpredict(Modellean, terms = c("mean_AvgEA", "food"), ci= 0.95)
-plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
-
 
 ggplot(
   data = PhysioActData, 
@@ -285,26 +368,6 @@ ggplot(
 predict.ModelFat <- ggpredict(ModelFat, terms = c("leanmass"), ci.lvl = 0.95)
 plot(predict.ModelFat, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
-
-
-
-fatm_burst  <- lme(logFM ~ count_BurstScore,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-fatm_var    <- lme(logFM ~ mean_VAR,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-fatm_avgEA  <- lme(logFM ~ mean_corrAvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-fatm_maxEA  <- lme(logFM ~ mean_MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-
-AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
-
-
-
-ModelFatAct <- glmmTMB(log(fatmass) ~ log(leanmass) +log(mean_AvgEA) + food*greb1l + (1|tank) + (1|fam) , # <= Best Model 
-                   family = gaussian(),
-                   data = PhysioActData)
-
-
-hist(resid(ModelFatAct))
-qqPlot(resid(ModelFatAct))
-summary(ModelFatAct)
 
 ggplot(
   data = PhysioActData, 

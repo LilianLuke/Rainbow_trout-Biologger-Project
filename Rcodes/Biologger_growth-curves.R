@@ -10,7 +10,7 @@ library(writexl)
 library(openxlsx)
 library(ggplot2)
 library(ggeffects)
-
+library(glmmTMB)
 
 
 ## Step 1: Load the complete dataset, as it contains meausrements for february and may already.
@@ -180,7 +180,11 @@ ggplot(
   mapping = aes(x = Month, y = Length),
 ) +
   facet_wrap(~food)+
+<<<<<<< HEAD
   geom_boxplot(aes(fill=greb1l))+
+=======
+  geom_violin(aes(fill=greb1l))+
+>>>>>>> 32b421ce92b6f13335fcb68b3eada28a9ff6f1fa
   scale_fill_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")
 
@@ -259,48 +263,5 @@ ggplot(
         legend.text  = element_text(size = 18,face = "italic"),
   )+
   labs(y="Length (cm)")
-
-
-
-
-
-
-
-## Add fulton's CF 
-
-Full_Meas_Data_LF <- Full_Meas_Data_LF%>%
-  mutate(
-    Fulton = as.numeric((Weight/Length^3)*100),
-  )
-
-ggplot(
-  data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Fulton),
-) +
-  facet_wrap(~food)+
-  geom_boxplot(aes(fill=greb1l))+
-  scale_fill_manual(values = c("gold2", "royalblue"))
-
-
-Fulton <- glmmTMB(Fulton*10 ~ Month*food+greb1l+ (1 | tank/Biologger) + (1| fam),
-                  family = gaussian(), 
-                  data = Full_Meas_Data_LF)
-
-summary(Fulton)
-
-
-
-predict.Fulton <- ggpredict(Fulton, terms = c("Month", "food","greb1l"))
-colnames(predict.Fulton)[1] <- "Month"
-colnames(predict.Fulton)[2] <- "predicted Fulton"
-colnames(predict.Fulton)[6] <- "food"
-colnames(predict.Fulton)[7] <- "greb1l"
-
-ggplot(predict.Fulton, aes(y= `predicted Fulton`, x=Month, col= greb1l))+
-  facet_wrap(~food)+
-  geom_point()+
-  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
-
-
 
 
