@@ -1,4 +1,5 @@
 *.Rproj
+*.RDataTmp4
 path-file-jenni.R
 path_file_lilian.R
 path-file-lucy.R

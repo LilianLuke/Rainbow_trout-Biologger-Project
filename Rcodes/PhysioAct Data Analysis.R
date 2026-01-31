@@ -70,7 +70,7 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
     Date = ymd(Date),
-    Time = hms(Time),
+    Time = lubridate::hms(Time),
     BurstScore = as.numeric(BurstScore),
     Swimstyle = as.factor(Swimstyle),
     Season = as.factor(Season),
@@ -80,8 +80,8 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
     fatpercent = as.numeric(fatpercent),
     WeightMay = as.numeric(WeightMay),
     WeightMayDXA = as.numeric(WeightMayDXA),
-    NOAA_Sunrise = hms(NOAA_Sunrise),
-    NOAA_Sunset = hms(NOAA_Sunset),
+    NOAA_Sunrise = lubridate::hms(NOAA_Sunrise),
+    NOAA_Sunset = lubridate::hms(NOAA_Sunset),
     MeasNB = as.factor(MeasNB)
   )%>%
   mutate(
@@ -92,6 +92,7 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
   mutate(
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(Time),
   )
 
 
@@ -131,7 +132,7 @@ Data <- Data %>%
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
     Date = ymd(Date),
-    Time = hms::hms(Time),
+    Time = lubridate::hms(Time),
     BurstScore = as.numeric(BurstScore),
     Swimstyle = as.factor(Swimstyle),
     Season = as.factor(Season),
@@ -141,8 +142,8 @@ Data <- Data %>%
     fatpercent = as.numeric(fatpercent),
     WeightMay = as.numeric(WeightMay),
     WeightMayDXA = as.numeric(WeightMayDXA),
-    NOAA_Sunrise = hms(NOAA_Sunrise),
-    NOAA_Sunset = hms(NOAA_Sunset),
+    NOAA_Sunrise = lubridate::hms(NOAA_Sunrise),
+    NOAA_Sunset = lubridate::hms(NOAA_Sunset),
     MeasNB = as.numeric(MeasNB),
   )%>%
   mutate(
@@ -154,6 +155,7 @@ Data <- Data %>%
   mutate(
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(Time),
   )
 
 
@@ -178,16 +180,8 @@ str(Data$MeasNB)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
-
-ggplot(Data, aes(x = DayLength, y = log(VAR))) +
-  facet_wrap(~Season)+
-  geom_point() +
-  geom_smooth(method = "lm")+
-  theme_minimal()
-
-
 PhysioActData <- Data%>%  
-  group_by(#Light,
+  group_by(#MeasNB,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -196,7 +190,6 @@ PhysioActData <- Data%>%
     MaxEA = max(MaxEA, na.rm = TRUE),
     mean_VAR = mean(VAR, na.rm = TRUE),
     count_BurstScore = sum(BurstScore, na.rm = TRUE),
-    logBurstScore = as.numeric(log(count_BurstScore)),
     BurstProp = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
     WeightFeb = first(WeightFeb),
     WeightMay = first(WeightMay),
@@ -224,6 +217,7 @@ PhysioActData <- Data%>%
     Biologger != "UXL0500DAT",#|--  Loggers lacking some physiological data 
     Biologger != "UXL0442DAT",#|
     Biologger != "UXL0438DAT",#|
+    Biologger != "UXL0471DAT", ## This fish was shorter and lighter in may than in february, and I noted it was infected with flavio, so I exlcuded it from the measurements
   ) %>%
   mutate(
     greb1l = as.factor(greb1l),
@@ -233,53 +227,15 @@ PhysioActData <- Data%>%
     Biologger = as.factor(Biologger),
   )
 
-PhysioActDayta <- PhysioActData %>%
-  filter(
-    Light == "Day"
-  )
+PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "High Food",  "low-food" = "Low Food")
 
-PhysioActNight <- PhysioActData %>%
-  filter(
-    Light == "Night"
-  )
-
-
-ggplot(
-  data = `PhysioActData`, 
-  mapping = aes(x = Light, y = mean_MaxEA, fill=food)
-) +
-  geom_boxplot()
-
-
-str(PhysioActData$Biologger)
-str(PhysioActData$fam)
-str(PhysioActData$greb1l)
-str(PhysioActData$tank)
-str(PhysioActData$food)
-str(PhysioActData$Date)
-str(PhysioActData$Time)
-str(PhysioActData$DateTime)
-str(PhysioActData$BurstScore)
-str(PhysioActData$Swimstyle)
-str(PhysioActData$Season)
-
+str(PhysioActData)
+n_distinct(PhysioActData$Biologger)
 
 ## test if greb, food or activity affects lean mass
 
-leanm_burst  <- lme(leanmass ~ BurstProp,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_var    <- lme(leanmass ~ mean_VAR,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_avgEA  <- lme(leanmass ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_maxEA  <- lme(leanmass ~ mean_MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_corrAvgEA  <- lme(leanmass ~ mean_corrAvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-leanm_MaxEA  <- lme(leanmass ~ MaxEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-
-AIC(leanm_burst, leanm_var, leanm_avgEA, leanm_maxEA, leanm_corrAvgEA, leanm_MaxEA)
-
-
-
-Modellean <- lme(leanmass ~ log(mean_MaxEA)*greb1l+food, #<= BEST MODEL
-                 method="ML",
-                 random=list(fam=~1, tank=~1),
+Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
+                 family= gaussian(),
                  data = PhysioActData)
 
 performance(Modellean)
@@ -287,19 +243,23 @@ performance(Modellean)
 hist(resid(Modellean))
 qqPlot(resid(Modellean))
 summary(Modellean)
-anova(Modellean)
 
-predict.Modellean <- ggpredict(Modellean, terms = c("mean_MaxEA", "greb1l","food"), ci.lvl = 0.95)
+ggplot(PhysioActData, aes(y= leanmass, log(mean_AvgEA), col=greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_smooth(method="lm")
+
+predict.Modellean <- ggpredict(Modellean, terms = c("mean_AvgEA", "food"), ci= 0.95)
 plot(predict.Modellean, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
 
 ggplot(
-  data = PhysioActDayta, 
-  mapping = aes(x = mean_MaxEA, y = leanmass, col=greb1l)
+  data = PhysioActData, 
+  mapping = aes(x = mean_AvgEA, y = leanmass, col=greb1l)
 ) +
   facet_wrap(~food)+
   geom_point()+
-  geom_smooth()
+  geom_smooth(method = "lm")
 
 
 ## fat mass correlates with body size (lean mass)
@@ -337,7 +297,7 @@ AIC(fatm_burst, fatm_var, fatm_avgEA, fatm_maxEA)
 
 
 
-ModelFatAct <- glmmTMB(resid_fat ~ food + (1|fam)+ (1|tank), # <= Best Model 
+ModelFatAct <- glmmTMB(log(fatmass) ~ log(leanmass) +log(mean_AvgEA) + food*greb1l + (1|tank) + (1|fam) , # <= Best Model 
                    family = gaussian(),
                    data = PhysioActData)
 
@@ -348,14 +308,34 @@ summary(ModelFatAct)
 
 ggplot(
   data = PhysioActData, 
-  mapping = aes(x = food, y = resid_fat , fill=greb1l)
+  mapping = aes(x = food, y = fatpercent , fill=greb1l)
 ) +
-  geom_violin()
+  geom_boxplot()+
+  theme_bw(base_size = 16)+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  scale_x_discrete(name = "Food Treatment", labels = c("High Food", "Low Food"))+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic")
+        
+  )+
+  labs(y="Fat content (%)")
 ### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group
 
+PhysioActLF <- PhysioActData%>%
+  filter(
+    food == "Low Food"
+  )
+  
+ModelMassAct <- glmmTMB(log(WeightMay) ~log(mean_AvgEA) * greb1l+ food + (1|tank) + (1|fam) , # <= Best Model 
+                       family = gaussian(),
+                       data = PhysioActLF)
 
-
-
+summary(ModelMassAct)
 
 
 Fultonm_burst  <- lme(PercentDeltaFulton ~ log(BurstProp),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
@@ -391,7 +371,7 @@ r2c <- r2[1, "R2c"]
 
 
 
-BestModelFulton <- glmmTMB(PercentDeltaFulton ~ log(BurstProp)+greb1l + (1|fam) + (1| tank), #best model ?
+BestModelFulton <- glmmTMB(log(LengthMay) ~ log(meanAvgEA)+greb1l + (1|fam) + (1| tank), #best model ?
                        family = gaussian(),
                        data = PhysioActData)
 

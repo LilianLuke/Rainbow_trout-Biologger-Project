@@ -199,6 +199,7 @@ Clust <- Full_Data_Out[, c(6, 33, 34)]
 Clust_scaled<- scale(Clust[, c("VAR", "AvgEA", "MaxEA")])
 
 Clust_log <- log1p(Clust)
+
 # Initialize total within sum of squares error: wss
 wss <- 0
 

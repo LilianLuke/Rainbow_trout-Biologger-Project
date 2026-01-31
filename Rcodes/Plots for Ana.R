@@ -302,14 +302,15 @@ culling <- "2025-05-19"
 IndivActData <- IndivActData %>%
   mutate(
     culling=ymd(culling),
-  )
+)
+
 
 ggplot(IndivActData, aes(x = ymd(Date), y = mean_AvgEA, col=greb1l, group = Biologger)) +
   facet_wrap(~food)+
   geom_point()+
   geom_path()
 
-ggplot(Full_Data, aes(x = ymd(Date), y = AvgEA, col=greb1l)) +
+ggplot(Full_Data, aes(x = ymd(Date), y = log(AvgEA), col=greb1l)) +
   facet_wrap(~food)+
   geom_smooth()
 

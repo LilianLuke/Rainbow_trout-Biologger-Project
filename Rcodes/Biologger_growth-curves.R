@@ -14,11 +14,20 @@ library(ggeffects)
 
 
 ## Step 1: Load the complete dataset, as it contains meausrements for february and may already.
-
+setwd("C:/Users/03278487/OneDrive - Luonnonvarakeskus/Biologger-Rcode/Rcodes") 
 source("path_file_lilian.R")
 
 Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger Clean data.xlsx"))
 
+Full_Data_Clean <- Full_Data_Clean %>%
+  mutate(
+    Biologger = as.factor(Biologger),
+    PIT = as.factor(`PIT tag`)
+  )
+
+
+str(Full_Data_Clean$Biologger)
+str(Full_Data_Clean$PIT)
 
 ## Step 2: load the file with the measurements of November
 
@@ -33,12 +42,13 @@ Nov_Meas <- Nov_Meas %>%
 
 ## Step 3: merge the files together based on PIT tag 
 
-Full_Meas_Data <- Full_Data_Clean %>%
+Full_Meas_Datatest <- Full_Data_Clean %>%
   left_join(Nov_Meas, by = "PIT tag") %>%
   ##drop unnecessary columns
-  dplyr::select(Biologger, LengthNov, LengthFeb, LengthMay, WeightNov, WeightFeb, WeightMay, food, greb1l, tank, fam)%>%
+  dplyr::select(Biologger, `PIT tag`, AvgEA, LengthNov, LengthFeb, LengthMay, WeightNov, WeightFeb, WeightMay, food, greb1l, tank, fam)%>%
   group_by(Biologger)%>%
   summarize(
+    AvgEA = mean(AvgEA),
     LengthNov = first(LengthNov),
     WeightNov = first(WeightNov),
     LengthFeb = first(LengthFeb),
@@ -54,9 +64,10 @@ Full_Meas_Data <- Full_Data_Clean %>%
 
 ## Step 4: rearrange data to have only 3 columns (lenght, weight, and month)
 
-Nov_Meas_Data <- Full_Meas_Data %>%
+Nov_Meas_Data <- Full_Meas_Datatest %>%
   dplyr::select(
-    Biologger, 
+    Biologger,
+    AvgEA,
     LengthNov, 
     WeightNov,
     food,
@@ -72,9 +83,10 @@ Nov_Meas_Data <- Full_Meas_Data %>%
     Weight = WeightNov,
   )
   
-Feb_Meas_Data <- Full_Meas_Data %>%
+Feb_Meas_Data <- Full_Meas_Datatest %>%
   dplyr::select(
-    Biologger, 
+    Biologger,
+    AvgEA,
     LengthFeb, 
     WeightFeb,
     food,
@@ -90,9 +102,10 @@ Feb_Meas_Data <- Full_Meas_Data %>%
     Weight = WeightFeb,
   ) 
 
-May_Meas_Data <- Full_Meas_Data %>%
+May_Meas_Data <- Full_Meas_Datatest %>%
   dplyr::select(
-    Biologger, 
+    Biologger,
+    AvgEA,
     LengthMay, 
     WeightMay,
     food,
@@ -113,14 +126,27 @@ Full_Meas_Data_Clean <- Nov_Meas_Data %>%
   bind_rows(Feb_Meas_Data, May_Meas_Data)%>%
   mutate(
     Month = as.factor(Month),
+    Biologger = as.factor(Biologger),
+    greb1l = as.factor(greb1l),
+    tank = as.factor(tank),
+    fam = as.factor(fam),
+    food = as.factor(food),
+    
   )%>%
   filter(
-    !Length == "NA",
-    !Biologger == "UXL0471DAT" ## This fish was shorter and lighter in may than in february, and I noted it was infected with flavio, so I exlcuded it from the measurements
+    Length != "NA",
+    Weight != "NA",
+    Biologger != "UXL0471DAT", ## This fish was shorter and lighter in may than in february, and I noted it was infected with flavio, so I exlcuded it from the measurements
   )
-
+    
+    
 str(Full_Meas_Data_Clean$Month)
+str(Full_Meas_Data_Clean$Biologger)
+
 Full_Meas_Data_Clean$Month <- factor(Full_Meas_Data_Clean$Month, levels = c("Nov", "Feb", "May"))
+
+n_distinct(Full_Meas_Data_Clean$Biologger)
+
 
 ## Step 5: Plot the data 
 
@@ -146,6 +172,7 @@ ggplot(
 ## Looks like there is a greb effect in food-restricted ;/ 
 
 Full_Meas_Data_Clean$greb1l <- dplyr::recode(Full_Meas_Data_Clean$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
+Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food" = "High Food",  "low-food" = "Low Food")
 
 
 ggplot(
@@ -154,7 +181,8 @@ ggplot(
 ) +
   facet_wrap(~food)+
   geom_boxplot(aes(fill=greb1l))+
-  scale_fill_manual(values = c("gold2", "royalblue"))
+  scale_fill_manual(values = c("gold2", "royalblue"))+
+  geom_smooth(method = "lm")
 
 ggplot(
   data = Full_Meas_Data_Clean, 
@@ -163,6 +191,116 @@ ggplot(
   facet_wrap(~food)+
   geom_boxplot(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))
+
+
+##There is a trend, but GLMM on low food to confirm
+
+
+Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
+  mutate(
+    Month = as.factor(Month),
+    greb1l = as.factor(greb1l),
+    food = as.factor(food)
+  )%>%
+  filter(
+    food == "Low Food"
+  )
+
+
+Weight <- glmmTMB(Weight ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+                      family = gaussian(),
+                      data = Full_Meas_Data_LF)
+
+summary(Weight)
+
+Length <- glmmTMB(Length ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(), 
+                  data = Full_Meas_Data_LF)
+
+summary(Length)
+
+## Note: summer > winter, p = 0.0532 and 0.0579 for weight and length, respectively
+
+ggplot(
+  data = Full_Meas_Data_LF, 
+  mapping = aes(x = Month, y = Weight, fill=greb1l),
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  theme_bw(base_size = 16)+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
+  )+
+  labs(y="Weight (g)")
+
+
+
+ggplot(
+  data = Full_Meas_Data_LF, 
+  mapping = aes(x = Month, y = Length/10, fill=greb1l),
+) +
+  facet_wrap(~food)+
+  geom_boxplot()+
+  theme_bw(base_size = 16)+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  scale_x_discrete(name = "Month", labels = c("Nov 2024", "Feb 2025", "May 2025"))+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
+  )+
+  labs(y="Length (cm)")
+
+
+
+
+
+
+
+## Add fulton's CF 
+
+Full_Meas_Data_LF <- Full_Meas_Data_LF%>%
+  mutate(
+    Fulton = as.numeric((Weight/Length^3)*100),
+  )
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Fulton),
+) +
+  facet_wrap(~food)+
+  geom_boxplot(aes(fill=greb1l))+
+  scale_fill_manual(values = c("gold2", "royalblue"))
+
+
+Fulton <- glmmTMB(Fulton*10 ~ Month*food+greb1l+ (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(), 
+                  data = Full_Meas_Data_LF)
+
+summary(Fulton)
+
+
+
+predict.Fulton <- ggpredict(Fulton, terms = c("Month", "food","greb1l"))
+colnames(predict.Fulton)[1] <- "Month"
+colnames(predict.Fulton)[2] <- "predicted Fulton"
+colnames(predict.Fulton)[6] <- "food"
+colnames(predict.Fulton)[7] <- "greb1l"
+
+ggplot(predict.Fulton, aes(y= `predicted Fulton`, x=Month, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
+
 
 
 
