@@ -36,7 +36,7 @@ setwd(path.raw)
 #list all individual logger files
 Biologgers <- list.files(path = path.raw, pattern="\\DAT.CSV")
 
-## ATTENTION : The CSV encoding is ISO-8859-1 (Latin-1), not UTF-8
+## WARNING : The CSV encoding is ISO-8859-1 (Latin-1), not UTF-8
 
 ##Merge all individual files in one data frame
 merged_df <- map_dfr(Biologgers, function(fpath) {
@@ -161,8 +161,6 @@ lookupGen <- lookupGen %>%
   #keep only useful columns
   dplyr::select(greb1l, omy05, fam, tank, food, `PIT tag`)
 
-## Calculate modified Fulton's condition factor
- 
 
 ## Add genotyping and food treatment data to creat a DF with all the data
 Full_Data <- merged_with_Meas %>%

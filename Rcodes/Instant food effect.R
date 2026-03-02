@@ -29,8 +29,8 @@ library(tools)
 library(ggeffects)
 
 
-
-Full_Data_Clean <- read_xlsx("C:/Users/03278487/OneDrive - Valtion/General - ThermoEvo/Lilian data/R outputs/Biologgers data/Biologger Clean data.xlsx") 
+source("path_file_lilian.R")
+Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger final data.xlsx")) 
 
 
 Full_Data_Out <- Full_Data_Clean %>%
@@ -41,6 +41,7 @@ Full_Data_Out <- Full_Data_Clean %>%
     fam = as.factor(fam),
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
+    Light = as.factor(Light),
   ) %>%
   ## Convert Date and Time back to a format that can be plotted correctly
   mutate(
@@ -53,27 +54,17 @@ Full_Data_Out <- Full_Data_Clean %>%
 
 
 
-##Create a log column for each act parameter to be able to run GAMMS on it
-Full_Data_Out <- Full_Data_Out %>%
-  group_by(Biologger) %>%
-  mutate(
-    LogAvgEA = as.numeric(log10(`AvgEA`+0.001)),
-    LogMaxEA = as.numeric(log10(`MaxEA`+0.001)),
-    LogVAR = as.numeric(log10(VAR+0.76)),
-    corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
-  )
-
 ##Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
     BurstScore = as.numeric(if_else(
-      VAR < 220,
+      VAR < 190,
       0,
       1,
     )),
     ##Add a SwimStyle column to be able to split data based on bursting
     Swimstyle = as.factor(if_else(
-      VAR < 220,
+      VAR < 190,
       "Steady",
       "Burst",
     )),
@@ -91,17 +82,8 @@ Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Sprin
 Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
 
 ## make sure factors are read correctly
+str(Full_Data_Out)
 str(Full_Data_Out$Biologger)
-str(Full_Data_Out$fam)
-str(Full_Data_Out$greb1l)
-str(Full_Data_Out$omy05)
-str(Full_Data_Out$tank)
-str(Full_Data_Out$Date)
-str(Full_Data_Out$Time)
-str(Full_Data_Out$DateTime)
-str(Full_Data_Out$BurstScore)
-str(Full_Data_Out$Swimstyle)
-str(Full_Data_Out$Tempgroup)
 
 
 comparefooddata <- Full_Data_Out %>%
@@ -135,45 +117,91 @@ middayfooddata <- comparefooddata %>%
   )
 
 
-
-
-FoodBurst <- middayfooddata%>%  
-  group_by(Light, food, Tempgroup, daytime, start_type, fasting, Biologger) %>%
-  summarise(
-    mean_BurstScore = as.numeric(100*mean(BurstScore, na.rm = TRUE)),
-    mean_corr.AvgEA = mean(corr.AvgEA),
-    Biologger = first(Biologger),
-    greb1l = first(greb1l),
-    food = first(food),
-    fam = first(fam),
-    tank = first(tank),
-    LengthFeb = first(LengthFeb),
-    WeightFeb = first(WeightFeb)
+dayfooddataLM <- middayfooddata %>%
+  filter(
+    start_type == "noon",
+    Light=="Day"
+  )%>%
+  mutate(
+    Date=as.numeric(Date)
   )
 
 
-Fasting <- lme(mean_corr.AvgEA ~ Light*daytime*start_type*food*Tempgroup, ##best model
+nightfooddataLM <- middayfooddata %>%
+  filter(
+    start_type == "midnight"
+  )%>%
+  mutate(
+    Date=as.numeric(Date)
+  )
+
+
+
+Fasting <- lme(log(AvgEA) ~ Date*daytime*food,
                      method="ML",
-                     random=list(fam=~1, tank=~1),
-                     data = FoodBurst)
+                     random=list(Biologger=~1, fam=~1, tank=~1),
+                     data = middayfooddataLM)
 hist(resid(Fasting))
 qqPlot(resid(Fasting))
 summary(Fasting)
-predict.Fasting <- ggpredict(Fasting, terms = c("Tempgroup", "daytime", "start_type", "food"), ci.lvl = 0.95, bias_correction = TRUE)
+predict.Fasting <- ggpredict(Fasting, terms = c("Date", "daytime", "food", "Light"), ci.lvl = 0.95, bias_correction = TRUE)
 plot(predict.Fasting)
 
-EMM <- emmeans(Fasting, ~daytime+start_type+Tempgroup, data=FoodBurst) 
-EMM_resp <- regrid(EMM)
-pairs(EMM_resp, adjust="none")
+Fasting <- bam(AvgEA ~ s(Date) + daytime*food+ s(tank, bs="re")+ s(Biologger, bs="re") + s(fam, bs="re"),
+               family = Gamma(link = "log"),
+               data = dayfooddataLM)
 
+Fasting <- bam(AvgEA ~ s(Date) + daytime*food*Light+ s(tank, bs="re")+ s(Biologger, bs="re") + s(fam, bs="re"),
+               family = Gamma(link = "log"),
+               data = nightfooddataLM)
+
+
+EMM <- emmeans(Fasting, ~ daytime*food*start_type, data=nightfooddataLM) 
+EMM_resp <- regrid(EMM)
+pairs(EMM_resp)
+
+### The model shows a general effect of the food treatment, with activity being lower in the low food group 
+### compared to the high food group on the afternoon of the second feeding day
+
+### It also shows a significant immediate effect of absence of food, 
+### with activity being significantly lower on the morning of the fasting day
+### compared to the afternoon of the feeding day
+
+
+### Note: the low-fed fish are already less active in the night before the fasting day,
+### which suggests that they may have learned the feeding schedule.
+
+
+middayfooddatanoon <- middayfooddata %>%
+  filter(
+    start_type == "midnight",
+    Light == "Day"
+  )
+
+ggplot(
+  data = middayfooddatanoon, 
+  mapping = aes(x = Date, y = BurstScore, color=food),
+) +
+  facet_wrap(~daytime)+
+  geom_point()+
+  geom_smooth()
+
+
+ggplot(
+  data = middayfooddatanoon, 
+  mapping = aes(x = Date, y = BurstScore, color=daytime),
+) +
+  facet_wrap(~food)+
+  geom_point(alpha=.05)+
+  geom_smooth(method=lm)
 
 
 
 ggplot(
   data = FoodBurst, 
-  mapping = aes(x = Tempgroup, y = mean_corr.AvgEA, color=start_type),
+  mapping = aes(x = Tempgroup, y = mean_AvgEA, fill=start_type),
 ) +
-  facet_wrap(~daytime+food+Light)+
+  facet_wrap(~daytime+food)+
   geom_boxplot()
 
 ggplot(

@@ -74,6 +74,22 @@ Full_Data$food <- dplyr::recode(Full_Data$food, "high-food" = "High Food",  "low
 Full_Data$Swimstyle <- dplyr::recode(Full_Data$Swimstyle, "Dynamic" = "Active Swimming",  "Steady" = "Steady Swimming")
 
 
+
+## Plot temperature data over time
+
+ggplot(data=Full_Data, aes(y= Temp, x=Date))+
+  geom_point(alpha=.01)+
+  geom_smooth(method="gam")+
+  theme_bw(base_size = 16)+
+  theme(axis.title.x = element_text(size=20, face = "bold"),
+        axis.title.y = element_text(size=20, face = "bold"),
+        axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=20),
+  )+
+  labs(y="Temperature (°C)")+
+  ylim(0,8)
+
+
 Avg1 <- glmmTMB(AvgEA ~ Light*Season*food*greb1l+ (1 | tank/Biologger) + (1 | fam),
               family = Gamma(link="log"), 
               data = Full_Data)

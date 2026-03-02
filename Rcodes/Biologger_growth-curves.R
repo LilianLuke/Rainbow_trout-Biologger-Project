@@ -180,11 +180,8 @@ ggplot(
   mapping = aes(x = Month, y = Length),
 ) +
   facet_wrap(~food)+
-<<<<<<< HEAD
   geom_boxplot(aes(fill=greb1l))+
-=======
   geom_violin(aes(fill=greb1l))+
->>>>>>> 32b421ce92b6f13335fcb68b3eada28a9ff6f1fa
   scale_fill_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")
 
