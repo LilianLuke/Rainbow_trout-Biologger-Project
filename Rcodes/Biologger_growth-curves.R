@@ -14,7 +14,6 @@ library(glmmTMB)
 
 
 ## Step 1: Load the complete dataset, as it contains meausrements for february and may already.
-setwd("C:/Users/03278487/OneDrive - Luonnonvarakeskus/Biologger-Rcode/Rcodes") 
 source("path_file_lilian.R")
 
 Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger Clean data.xlsx"))
@@ -208,42 +207,47 @@ Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
   )
 
 
-Weight <- glmmTMB(Weight ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+Weight <- glmmTMB(Weight ~ (Month+greb1l)*food + (1 | tank/Biologger) + (1| fam),
                       family = gaussian(),
-                      data = Full_Meas_Data_LF)
+                      data = Full_Meas_Data_Clean)
 
 summary(Weight)
 
-Length <- glmmTMB(Length ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+Length <- glmmTMB(Length ~ (Month+greb1l)*food + (1 | tank/Biologger) + (1| fam),
                   family = gaussian(), 
-                  data = Full_Meas_Data_LF)
+                  data = Full_Meas_Data_Clean)
 
 summary(Length)
 
-## Note: summer > winter, p = 0.0532 and 0.0579 for weight and length, respectively
+## Note: greb1l:food, p = 0.232 and 0.0744 for weight and length, respectively
+
+
+Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "High Food" = "Ad Libitum",  "Low Food" = "Food Restricted")
+
 
 ggplot(
-  data = Full_Meas_Data_LF, 
+  data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight, fill=greb1l),
 ) +
   facet_wrap(~food)+
   geom_boxplot()+
   theme_bw(base_size = 16)+
   scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  scale_x_discrete(name = "Month", labels = c("Nov 2024", "Feb 2025", "May 2025"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18),
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=14),
         strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic"),
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic"),
   )+
   labs(y="Weight (g)")
 
 
 
 ggplot(
-  data = Full_Meas_Data_LF, 
+  data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Length/10, fill=greb1l),
 ) +
   facet_wrap(~food)+
@@ -253,12 +257,31 @@ ggplot(
   scale_x_discrete(name = "Month", labels = c("Nov 2024", "Feb 2025", "May 2025"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18),
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=14),
         strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic"),
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic"),
   )+
   labs(y="Length (cm)")
 
+
+
+Gen_Meas_Data <- Full_Meas_Data_Clean%>%
+  group_by(greb1l, food, Month)%>%
+  summarise(
+    Length = mean(Length),
+    Weight = mean(Weight),
+  )
+
+
+ggplot(
+  data = Gen_Meas_Data, 
+  mapping = aes(x = Month, y = Length, col=greb1l, group = greb1l),
+) +
+  facet_wrap(~food)+
+  geom_point(alpha=.5)+
+  geom_path()+
+  theme(legend.position = "none")+
+  scale_color_manual(values = c("gold2", "royalblue"))
 

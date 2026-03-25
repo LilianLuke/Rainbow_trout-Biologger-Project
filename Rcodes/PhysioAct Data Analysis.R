@@ -97,23 +97,7 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
 
 
 ## make sure factors are read correctly
-str(Full_Data_ActnPhysio$Biologger)
-str(Full_Data_ActnPhysio$fam)
-str(Full_Data_ActnPhysio$greb1l)
-str(Full_Data_ActnPhysio$omy05)
-str(Full_Data_ActnPhysio$tank)
-str(Full_Data_ActnPhysio$Date)
-str(Full_Data_ActnPhysio$Time)
-str(Full_Data_ActnPhysio$DateTime)
-str(Full_Data_ActnPhysio$BurstScore)
-str(Full_Data_ActnPhysio$Swimstyle)
-str(Full_Data_ActnPhysio$Season)
-str(Full_Data_ActnPhysio$Light)
-str(Full_Data_ActnPhysio$feeders)
-str(Full_Data_ActnPhysio$DayLength)
-str(Full_Data_ActnPhysio$NOAA_Sunrise)
-str(Full_Data_ActnPhysio$NOAA_Sunset)
-str(Full_Data_ActnPhysio$MeasNB)
+str(Full_Data_ActnPhysio)
 
 
 #write_xlsx(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.xlsx"))
@@ -160,21 +144,7 @@ Data <- Data %>%
 
 
 
-str(Data$Biologger)
-str(Data$fam)
-str(Data$greb1l)
-str(Data$omy05)
-str(Data$tank)
-str(Data$Date)
-str(Data$Time)
-str(Data$DateTime)
-str(Data$BurstScore)
-str(Data$Swimstyle)
-str(Data$Season)
-str(Data$Light)
-str(Data$feeders)
-str(Data$DayLength)
-str(Data$MeasNB)
+str(Data)
 
 
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
@@ -182,6 +152,7 @@ Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 PhysioActData <- Data%>%  
   group_by(#MeasNB,
+    Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -197,6 +168,7 @@ PhysioActData <- Data%>%
     LengthMay = first(LengthMay),
     FultonFeb = first(FultonFeb),
     FultonMay = first(FultonMay),
+    SGRMass = first(SGRMass),
     PercentDeltaFulton = first(PercentDeltaFulton),
     greb1l = first(greb1l),
     food = first(food),
@@ -212,11 +184,6 @@ PhysioActData <- Data%>%
     leanmass = first(leanmass),
   )%>%  
   filter(
-    Biologger != "UXL0552DAT",#|
-    Biologger != "UXL0550DAT",#|
-    Biologger != "UXL0500DAT",#|--  Loggers lacking some physiological data 
-    Biologger != "UXL0442DAT",#|
-    Biologger != "UXL0438DAT",#|
     Biologger != "UXL0471DAT", ## This fish was shorter and lighter in may than in february, and I noted it was infected with flavio, so I exlcuded it from the measurements
   ) %>%
   mutate(
@@ -227,7 +194,87 @@ PhysioActData <- Data%>%
     Biologger = as.factor(Biologger),
   )
 
+
 PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "High Food",  "low-food" = "Low Food")
+
+
+ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biologger))+
+  facet_wrap(~tank)+
+  geom_point()+
+  geom_path()+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+
+ActBodyCorr <- glmmTMB(SGRMass ~ mean_AvgEA+ (1| Tank)+ (1| fam), 
+                       family= gaussian(),
+                       data = PhysioActData23)
+
+performance(ActBodyCorr)
+hist(resid(ActBodyCorr))
+qqPlot(resid(ActBodyCorr))
+summary(ActBodyCorr)
+
+ggplot(data=PhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+  facet_wrap(~Swimstyle+food)+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+ggplot(data=PhysioActData23, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+StdPhysioActData <- PhysioActData%>%
+  filter(
+    Swimstyle == "Steady"
+  )
+
+StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food+ (1 | Biologger)+ (1 | tank) + (1| fam) , #<= BEST MODEL
+                      family= gaussian(),
+                      data = StdPhysioActData)
+
+summary(StdActSGRCorr)
+performance(StdActSGRCorr)
+
+ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+BrstPhysioActData <- PhysioActData%>%
+  filter(
+    Swimstyle == "Dynamic"
+  )
+
+BrstActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food+ (1 | Biologger)+ (1 | tank) + (1| fam) , #<= BEST MODEL
+                         family= gaussian(),
+                         data = BrstPhysioActData)
+
+summary(BrstActSGRCorr)
+performance(BrstActSGRCorr)
+
+
+ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+  facet_wrap(~food)+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))
+
+
+
+ActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA*Swimstyle+ (1 | Biologger) , #<= BEST MODEL
+                       family= gaussian(),
+                       data = PhysioActData)
+
+summary(ActSGRCorr)
+performance(ActSGRCorr)
+
+
 
 SteadyActLF <- SteadyActData %>%
   filter(
@@ -249,18 +296,11 @@ ggplot(
   geom_smooth(method="lm")
 
 
-MassActData <- PhysioActData %>%
-  left_join(DataReg, by="Biologger")%>%
-  filter(
-    food=="low-food"
-  )
-
-
   
   
-ActBodyCorr <- glmmTMB(mean_pred.AvgEA ~ WeightFeb, #<= BEST MODEL
+ActBodyCorr <- glmmTMB(mean_AvgEA ~ WeightFeb+food*greb1l, #<= BEST MODEL
                      family= gaussian(),
-                     data = MassActData)
+                     data = PhysioActData)
 
 summary(ActBodyCorr)
 performance(ActBodyCorr)
@@ -379,24 +419,42 @@ ggplot(
   scale_x_discrete(name = "Food Treatment", labels = c("High Food", "Low Food"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18),
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=16),
         strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic")
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic")
         
   )+
-  labs(y="Fat content (%)")
+  labs(y="Fat content in May (%)")+
+  ylim(0,17)
+
+
+ggplot(
+  data = PhysioActData, 
+  mapping = aes(x = food, y = leanmass , fill=greb1l)
+) +
+  geom_boxplot()+
+  theme_bw(base_size = 16)+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  scale_x_discrete(name = "Food Treatment", labels = c("High Food", "Low Food"))+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=16),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic")
+        
+  )+
+  labs(y="Lean mass in May (g)")+
+  ylim(0, 600)
+
 ### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group
 
-PhysioActLF <- PhysioActData%>%
-  filter(
-    food == "Low Food"
-  )
-  
-ModelMassAct <- glmmTMB(log(WeightMay) ~log(mean_AvgEA) * greb1l+ food + (1|tank) + (1|fam) , # <= Best Model 
+ModelMassAct <- glmmTMB(leanmass ~(mean_AvgEA+food) * greb1l + (1|tank) + (1|fam) , # <= Best Model 
                        family = gaussian(),
-                       data = PhysioActLF)
+                       data = PhysioActData)
 
 summary(ModelMassAct)
 

@@ -29,6 +29,7 @@ str(Full_Data)
 
 Full_Data <- Full_Data %>%
   mutate(
+    Temp = as.numeric(Temp),
     greb1l = as.factor(greb1l),
     omy05 = as.factor(omy05),
     food = as.factor(food),
@@ -70,6 +71,8 @@ Full_Data$Light <- factor(Full_Data$Light, levels = c("Night", "Day"))
 Full_Data$Season <- factor(Full_Data$Season, levels = c("Winter", "Spring"))
 Full_Data$food <- factor(Full_Data$food, levels = c("high-food", "low-food"))
 
+Full_Data$MeasNB <- factor(Full_Data$MeasNB, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"))
+
 Full_Data$food <- dplyr::recode(Full_Data$food, "high-food" = "High Food",  "low-food" = "Low Food")
 Full_Data$Swimstyle <- dplyr::recode(Full_Data$Swimstyle, "Dynamic" = "Active Swimming",  "Steady" = "Steady Swimming")
 
@@ -77,7 +80,7 @@ Full_Data$Swimstyle <- dplyr::recode(Full_Data$Swimstyle, "Dynamic" = "Active Sw
 
 ## Plot temperature data over time
 
-ggplot(data=Full_Data, aes(y= Temp, x=Date))+
+ggplot(data=Full_Data, aes(y= Temp, x=MeasNB, col=tank))+
   geom_point(alpha=.01)+
   geom_smooth(method="gam")+
   theme_bw(base_size = 16)+
@@ -128,6 +131,7 @@ summary(Avg3)
 Full_Data_GAMM <- Full_Data %>%
   mutate(
     Date=as.numeric(Date),
+    tank = as.factor(tank),
     food_greb=as.ordered(interaction(food, greb1l)),
   )
 
@@ -141,12 +145,12 @@ contrasts(Full_Data_GAMM$food_greb) <- "contr.treatment"
 ## I had doubt on whether I should add biologger as a random intercept  s(Biologger, bs = "re") or random smooth s(Date, Biologger, bs = "fs"), so I tried both to compare AICs
 ## k was set to 20 because there are ~20 measurements periods (20*24hrs)
 
-GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Date, Biologger, bs = "fs", m=1)+ s(tank, bs="re") + s(fam, bs="re") + Light,
+GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Date, Biologger, bs = "fs", m=1)+ s(LengthFeb, bs="re") + s(tank, bs="re") + s(fam, bs="re") + Light,
                   family = Gamma(link = "log"),
                   data = Full_Data_GAMM)
 
 
-GAMMAvg2 <- bam(AvgEA ~ food_greb+ s(Date) + s(Date, by = food_greb) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re") + Light,
+GAMMAvg2 <- bam(AvgEA ~ food*greb1l + s(Date) + s(Date, by = food_greb) + s(Biologger, bs = "re")+ s(LengthFeb, bs="re") + s(tank, bs="re") + s(fam, bs="re") + Light + s(Temp),
                 family = Gamma(link = "log"),
                 data = Full_Data_GAMM)
 
@@ -167,35 +171,6 @@ summary(GAMMAvg2)
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
 
 
-AvgGAMM.pred <- predict_gam(GAMMAvg2, length_out=20, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
-
-
-AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
-
-plot(AvgGAMM.predTEST, series = "Date", comparison = "greb1l")+
-  facet_grid(~food)
-
-AvgGAMM.pred <- predict_gam(GAMMAvg1, length_out=21, exclude_terms = c("s(Date, Biologger)","s(tank)", "s(fam)"), separate = list(food_greb = c("food", "greb1l")))
-
-AvgGAMM.pred <- AvgGAMM.pred %>%
-  mutate(
-    Date = as.numeric(Date),
-    food = as.factor(food),
-    greb1l = as.ordered(greb1l),
-    Date = as.Date(Date),
-  )
-
-
-ggplot(data=AvgGAMM.pred, aes(y= AvgEA, x=ymd(Date), col= greb1l))+
-  facet_wrap(~food+Light)+
-  geom_point(alpha=.2)+
-  geom_smooth()+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
-
-## Predictions are pretty much what we saw on the previous plots we made :
-
-
 ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
   facet_wrap(~food)+
   geom_point(alpha=.1)+
@@ -213,62 +188,44 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
   labs(y="log-transformed Average EA (mg)")
 
 
-ggplot(data=MaxGAMM.pred, aes(y= MaxEA, x=Date, col= greb1l))+
-  facet_wrap(~food)+
-  geom_point(alpha=.05)+
-  geom_smooth()
-
-ggplot(data=Full_Data, aes(y= log(MaxEA), x=Date, col= greb1l))+
-  facet_wrap(~food)+
-  geom_point(alpha=.05)+
-  geom_smooth()+
-  ylim(2,4)
-
-###Note : MaxEA variation is almost opposit to that of AvgEA: No difference in feb/march, but summer<winter when temp warms up
-## interpretation: allele 1 does more "bursts", when MaxEA is the same, AvgEA is higher for summer, 
-## but when temp warms up, summer fish reduce the intensity of their bursts and AvgEA then reduces to match that of winter fish
-
-
-ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
-  facet_wrap(~food+Light)+
-#  geom_point(alpha=.2)+
-  geom_smooth(method="gam", level=0.95)+
-  scale_color_manual(values = c("gold2", "royalblue"))+
-  theme_bw()
-
-
-## Predictions are Light## Predictions are pretty much what we saw on the previous plots we made
-
-
 ## Just to make sure that there is an actual difference between allele 1 and 2 in low food, I ran gamm() separately in both food groups
 
 Full_Data_GAMM_HighFood <- Full_Data_GAMM %>% 
   filter(
-    food == "high-food"
+    food == "High Food"
   )
 
 
 Full_Data_GAMM_LowFood <- Full_Data_GAMM %>% 
   filter(
-    food == "low-food"
+    food == "Low Food"
   )
 
 
-## Run GAMMs (the way I am used to, with the "random=" argument for random terms)
+## Let's do low food first
 
 
-GAMMAvgLF <- gamm(AvgEA ~ greb + s(Date) + s(Date, by=greb) + Light,
+GAMMAvgLF <- bam(AvgEA ~ greb1l*Swimstyle + s(Date, k=40) + s(Date, by=greb1l, k=40) + Light+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
                   family = Gamma(link = "log"),
-                  random=list(fam=~1, tank =~1, Biologger=~1),
                   data = Full_Data_GAMM_LowFood)
 
-summary(GAMMAvgLF$gam)
+gam.check(GAMMAvgLF)
+concurvity(GAMMAvgLF)
+summary(GAMMAvgLF)
+
+##Adding the greb*swim interaction improves the model quite a lot
 
 ### Confirms results of the big model: no effect of greb alone in either case, 
 ## but effect of smooth by greb in low food => what we see on the plot
 
 
+GAMMAvgHF <- bam(AvgEA ~ greb1l*Swimstyle + s(Date, k=40) + s(Date, by=greb1l, k=40) + Light+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
+                 family = Gamma(link = "log"),
+                 data = Full_Data_GAMM_HighFood)
 
+gam.check(GAMMAvgHF)
+concurvity(GAMMAvgHF)
+summary(GAMMAvgHF)
 
 
 ## Now let's test if the difference in activity is actually in Active or Steady swimming, or both
@@ -291,27 +248,20 @@ ggplot(data=LFdata, aes(y= log(AvgEA), x=Date, col= greb1l))+
         axis.text.x = element_text(size=18),
         axis.text.y = element_text(size=18),
         strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18, face = "italic")
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14, face = "italic")
   )+
   labs(y="log-transformed Average EA (mg)")
 
-## Looks like the difference is actually only in steady swimming... And fairly linear?
-## Maybe a simple GLMM is enough here then
+HFdata <- Full_Data %>%
+  filter(
+    food == "High Food"
+  )
 
-LFAvgGLMM <- glmmTMB(AvgEA ~ Light + greb1l*Swimstyle + (1 | tank/Biologger) + (1| fam),
-                     family = Gamma(link="log"), 
-                     data = LFdata)
-performance(LFAvgGLMM)
-summary(LFAvgGLMM)
-
-## Maybe the plot + the significant interaction is enough to show the "difference in activity is actually a difference in steady swimming data"
-## This would also explains why the difference is so small
-
-ggplot(data=LFdata, aes(y= log(AvgEA), x=ymd(Date), col= greb1l))+
+ggplot(data=LFdata, aes(y= log(AvgEA), x=Date, col= greb1l))+
   facet_wrap(~Swimstyle)+
   geom_point(alpha=.1)+
-  geom_smooth(method="lm")+
+  geom_smooth(method="gam")+
   theme_bw(base_size = 16)+
   scale_color_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
@@ -319,12 +269,10 @@ ggplot(data=LFdata, aes(y= log(AvgEA), x=ymd(Date), col= greb1l))+
         axis.text.x = element_text(size=18),
         axis.text.y = element_text(size=18),
         strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18, face = "italic")
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14, face = "italic")
   )+
   labs(y="log-transformed Average EA (mg)")
-
-
 
 
 ### And now it's back to regular glmms I showed in the last meeting
