@@ -178,9 +178,9 @@ ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Length),
 ) +
-  facet_wrap(~food)+
+  facet_wrap(~tank)+
   geom_boxplot(aes(fill=greb1l))+
-  geom_violin(aes(fill=greb1l))+
+  #geom_violin(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")
 
@@ -188,23 +188,12 @@ ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight),
 ) +
-  facet_wrap(~food)+
+  facet_wrap(~tank)+
   geom_boxplot(aes(fill=greb1l))+
   scale_fill_manual(values = c("gold2", "royalblue"))
 
 
-##There is a trend, but GLMM on low food to confirm
-
-
-Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
-  mutate(
-    Month = as.factor(Month),
-    greb1l = as.factor(greb1l),
-    food = as.factor(food)
-  )%>%
-  filter(
-    food == "Low Food"
-  )
+##There is a trend, see what the GLMM says with month+greb1l*food
 
 
 Weight <- glmmTMB(Weight ~ (Month+greb1l)*food + (1 | tank/Biologger) + (1| fam),
@@ -222,8 +211,37 @@ summary(Length)
 ## Note: greb1l:food, p = 0.232 and 0.0744 for weight and length, respectively
 
 
+Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
+  mutate(
+    Month = as.factor(Month),
+    greb1l = as.factor(greb1l),
+    food = as.factor(food)
+  )%>%
+  filter(
+    food == "High Food"
+  )
+
+
+Weight <- glmmTMB(Weight ~ Month+ greb1l + (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(),
+                  data = Full_Meas_Data_LF)
+
+summary(Weight)
+
+Length <- glmmTMB(Length ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+                  family = gaussian(), 
+                  data = Full_Meas_Data_LF)
+
+summary(Length)
+
+
 Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "High Food" = "Ad Libitum",  "Low Food" = "Food Restricted")
 
+
+Full_Meas_Data_Clean %>%
+  filter(food == "Low Food")%>%
+  group_by(Month, greb1l) %>%
+  summarise_at(vars(Weight, Length), list(mean = mean, sd=sd))
 
 ggplot(
   data = Full_Meas_Data_Clean, 

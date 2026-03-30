@@ -150,7 +150,7 @@ GAMMAvg1 <- bam(AvgEA ~ food_greb+ s(Date, k=20) + s(Date, by = food_greb, k=20)
                   data = Full_Data_GAMM)
 
 
-GAMMAvg2 <- bam(AvgEA ~ food*greb1l + s(Date) + s(Date, by = food_greb) + s(Biologger, bs = "re")+ s(LengthFeb, bs="re") + s(tank, bs="re") + s(fam, bs="re") + Light + s(Temp),
+GAMMAvg2 <- bam(AvgEA ~ food*greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re"),
                 family = Gamma(link = "log"),
                 data = Full_Data_GAMM)
 
@@ -166,13 +166,19 @@ concurvity(GAMMAvg2) ##Model parameters are much better in GAMMAvg2 (less concur
 ## Note : I did not find a way to nest tank/Biologger as random, especially with that smooth thing, but I think that's okay as it is?
 
 summary(GAMMAvg2)
+AIC(GAMMAvg2)
+
+
+EMMF2 <- emmeans(GAMMAvg2, ~Swimstyle:greb1l:food, data=Full_Data_GAMM) 
+EMM_respF2 <- regrid(EMMF2)
+pairs(EMM_respF2, adjust="none")
+
 
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
-
-
+  
 ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
-  facet_wrap(~food)+
+  facet_wrap(~food+Swimstyle)+
   geom_point(alpha=.1)+
   geom_smooth()+
   theme_bw(base_size = 16)+
@@ -185,7 +191,12 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
         legend.title = element_text(size = 20, face = "italic"),
         legend.text  = element_text(size = 18,face = "italic")
   )+
-  labs(y="log-transformed Average EA (mg)")
+  labs(y="log(AvgEA) (mg)")
+
+
+
+
+
 
 
 ## Just to make sure that there is an actual difference between allele 1 and 2 in low food, I ran gamm() separately in both food groups
@@ -205,7 +216,7 @@ Full_Data_GAMM_LowFood <- Full_Data_GAMM %>%
 ## Let's do low food first
 
 
-GAMMAvgLF <- bam(AvgEA ~ greb1l*Swimstyle + s(Date, k=40) + s(Date, by=greb1l, k=40) + Light+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
+GAMMAvgLF <- bam(AvgEA ~ greb1l*Swimstyle + Light +  s(Date, k=20) + s(Date, by=greb1l, k=20)+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
                   family = Gamma(link = "log"),
                   data = Full_Data_GAMM_LowFood)
 
@@ -215,17 +226,24 @@ summary(GAMMAvgLF)
 
 ##Adding the greb*swim interaction improves the model quite a lot
 
+EMMF2 <- emmeans(GAMMAvgHF, ~greb1l:Swimstyle, data=Full_Data_GAMM_HighFood) 
+EMM_respF2 <- regrid(EMMF2)
+pairs(EMM_respF2)
+
+
+
 ### Confirms results of the big model: no effect of greb alone in either case, 
 ## but effect of smooth by greb in low food => what we see on the plot
 
 
-GAMMAvgHF <- bam(AvgEA ~ greb1l*Swimstyle + s(Date, k=40) + s(Date, by=greb1l, k=40) + Light+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
+GAMMAvgHF <- bam(AvgEA ~ greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, by=greb1l, k=20)+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
                  family = Gamma(link = "log"),
                  data = Full_Data_GAMM_HighFood)
 
 gam.check(GAMMAvgHF)
 concurvity(GAMMAvgHF)
 summary(GAMMAvgHF)
+
 
 
 ## Now let's test if the difference in activity is actually in Active or Steady swimming, or both
@@ -504,7 +522,5 @@ SpringMax5 <- glmmTMB(MaxEA ~ Light+food+greb1l+ (1 | tank/Biologger) + (1| fam)
                       data = Full_Data_Spring)
 #performance(SpringMax5)
 summary(SpringMax5)
-
-
 
 

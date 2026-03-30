@@ -219,7 +219,7 @@ ggplot(
   geom_point(alpha=.5)+
   geom_smooth()
 
-
+exp
 
 ## Save the new dataframe to path.data
 write_xlsx(Full_Data, paste0(path.data, "/Biologger full data.xlsx"))
