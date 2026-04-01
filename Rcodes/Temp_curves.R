@@ -109,10 +109,9 @@ Full_Temp <- Temp_Tank22 %>%
 
 ggplot(
   data = Full_Temp, 
-  mapping = aes(x = Date_Time, y = Temp,),
+  mapping = aes(x = Date_Time, y = Temp, col=Tank),
 ) +
   #facet_wrap(~Tank)+
-  geom_point(alpha=.1)+
-  geom_smooth()+
+  geom_line()+
   ylim(0,11)+
   theme_bw()
