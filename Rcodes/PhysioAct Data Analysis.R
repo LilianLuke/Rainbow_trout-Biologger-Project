@@ -152,7 +152,7 @@ Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 PhysioActData <- Data%>%  
   group_by(#MeasNB,
-    Swimstyle,
+    #Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -214,6 +214,15 @@ performance(ActBodyCorr)
 hist(resid(ActBodyCorr))
 qqPlot(resid(ActBodyCorr))
 summary(ActBodyCorr)
+
+
+
+ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=food, fill= greb1l))+
+  geom_boxplot()+
+  geom_smooth(method=lm)+
+  scale_fill_manual(values = c("gold2", "royalblue"))
+
+
 
 ggplot(data=PhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   facet_wrap(~Swimstyle+food)+

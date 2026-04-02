@@ -124,7 +124,7 @@ May_Meas_Data <- Full_Meas_Datatest %>%
 Full_Meas_Data_Clean <- Nov_Meas_Data %>%
   bind_rows(Feb_Meas_Data, May_Meas_Data)%>%
   mutate(
-    Month = as.factor(Month),
+    Month = as.character(Month),
     Biologger = as.factor(Biologger),
     greb1l = as.factor(greb1l),
     tank = as.factor(tank),
@@ -139,8 +139,16 @@ Full_Meas_Data_Clean <- Nov_Meas_Data %>%
   )
     
     
+Full_Meas_Data_Clean$Month <- dplyr::recode(Full_Meas_Data_Clean$Month, "Nov" = "2024-11-01",  "Feb" = "2025-02-01",  "May" = "2025-05-01")
+    
+    
 str(Full_Meas_Data_Clean$Month)
 str(Full_Meas_Data_Clean$Biologger)
+
+Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
+  mutate(
+    Month = as.Date(Month)
+  )
 
 Full_Meas_Data_Clean$Month <- factor(Full_Meas_Data_Clean$Month, levels = c("Nov", "Feb", "May"))
 
@@ -196,13 +204,14 @@ ggplot(
 ##There is a trend, see what the GLMM says with month+greb1l*food
 
 
-Weight <- glmmTMB(Weight ~ (Month+greb1l)*food + (1 | tank/Biologger) + (1| fam),
+
+Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
                       family = gaussian(),
                       data = Full_Meas_Data_Clean)
 
 summary(Weight)
 
-Length <- glmmTMB(Length ~ (Month+greb1l)*food + (1 | tank/Biologger) + (1| fam),
+Length <- glmmTMB(log(Length) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(), 
                   data = Full_Meas_Data_Clean)
 
@@ -212,23 +221,18 @@ summary(Length)
 
 
 Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
-  mutate(
-    Month = as.factor(Month),
-    greb1l = as.factor(greb1l),
-    food = as.factor(food)
-  )%>%
   filter(
-    food == "High Food"
+    food == "Low Food"
   )
 
 
-Weight <- glmmTMB(Weight ~ Month+ greb1l + (1 | tank/Biologger) + (1| fam),
+Weight <- glmmTMB(log(Weight) ~ Month+greb1l + (1 | tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(),
                   data = Full_Meas_Data_LF)
 
 summary(Weight)
 
-Length <- glmmTMB(Length ~ Month+greb1l + (1 | tank/Biologger) + (1| fam),
+Length <- glmmTMB(log(Length) ~ Month+greb1l + (1 | tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(), 
                   data = Full_Meas_Data_LF)
 
@@ -238,10 +242,10 @@ summary(Length)
 Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "High Food" = "Ad Libitum",  "Low Food" = "Food Restricted")
 
 
-Full_Meas_Data_Clean %>%
-  filter(food == "Low Food")%>%
-  group_by(Month, greb1l) %>%
-  summarise_at(vars(Weight, Length), list(mean = mean, sd=sd))
+Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
+  mutate(
+    Month = as.factor(Month)
+  )
 
 ggplot(
   data = Full_Meas_Data_Clean, 

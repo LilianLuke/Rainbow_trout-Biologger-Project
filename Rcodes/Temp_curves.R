@@ -109,13 +109,7 @@ Full_Temp <- Temp_Tank22 %>%
 
 Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6")
 
-
-
-Full_TempTEST <- Full_Temp %>%
-  mutate(
-    Date_Time = as.numeric(Date_Time)
-  )
-  
+Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("2", "3", "4", "5","6"))
   
 ggplot(
   data = Full_Temp, 
@@ -136,5 +130,104 @@ ggplot(
         legend.text  = element_text(size = 18)
   )+
   scale_color_colorblind(breaks=c(2, 3, 4, 5, 6))+
-  labs(y="Water temperature (°C)", x="Date & Time")
+  labs(x="Date & Time", y="Water temperature (°C)")
+
+
+
+
+### Import suntable obtained from NOAA solar calculator (and formated in excel)
+sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/NOAA_SunTimes.xlsx")
+sun_table <- sun_table %>%
+  select(Date, Sunrise, Sunset)%>%
+  mutate(Date=as.Date(Date))
+
+str(sun_table)
+#Add the sunrise and sunset to the main dataframe
+Full_Temp_DL <- Full_Temp %>%
+  left_join(sun_table, by = "Date")
+
+#Convert times to a time format and rename columns
+Full_Temp_DL <- Full_Temp_DL %>% 
+  mutate(
+    Sunrise = hm(Sunrise),
+    Sunset = hm(Sunset),
+  )%>%
+  rename(
+    NOAA_Sunrise = Sunrise,
+    NOAA_Sunset = Sunset,
+  )
+
+str(Full_Temp_DLTest$Time)
+
+### Calculate Daylength
+Full_Temp_DL <- Full_Temp_DL %>% 
+  mutate(
+    NOAA_Sunrise = as.numeric(NOAA_Sunrise),
+    NOAA_Sunset = as.numeric(NOAA_Sunset),
+    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "hours")
+  )%>%
+  mutate(
+    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
+    NOAA_Sunset = hms::hms(NOAA_Sunset),
+    Time = hms::hms(hms(Time)),
+    Light = as.factor(ifelse(Time < NOAA_Sunrise, 
+                             "Night",
+                             ifelse(Time < NOAA_Sunset,
+                                    "Day",
+                                    "Night")
+                             )
+                      )
+  )
+
+
+
+str(Full_Temp_DL)
+
+
+DayLengthPlot <- Full_Temp_DL%>%
+  group_by(Date)%>%
+  summarise(
+    DayLength=first(DayLength),
+    NightLength = 24-DayLength,
+    Date=first(Date),
+  ) %>%
+  pivot_longer(
+    cols = c(DayLength, NightLength),
+    names_to = "Period",
+    values_to = "hours"
+  )%>%
+  filter(
+    Date < "2025-05-21"
+  )
+
+DayLengthPlot$Period <- dplyr::recode(DayLengthPlot$Period, "DayLength" = "Day",  "NightLength" = "Night")
+DayLengthPlot$Period <- factor(DayLengthPlot$Period, levels = c("Night", "Day"))
+
+Full_Temp_DL <- Full_Temp_DL %>%
+  filter(
+    Date < "2025-05-20"
+  )
+
+Scale_factor = 24/max(Full_Temp_DL$Temp)
+
+
+ggplot(DayLengthPlot, aes(x = Date)) +
+  geom_col(aes(width=87000, y = hours, fill = Period)) +
+  scale_fill_manual(values = c("Night" = "midnightblue", "Day" = "#FFEBCD")) +
+  geom_line(data=Full_Temp_DL, aes(x = Date_Time, y = Scale_factor*Temp, col = Tank))+
+  scale_y_continuous(
+    name = "Day length (h)",
+    sec.axis=sec_axis(transform = ~./scale, name = "Temperature (°C)"))+
+  theme_bw()+
+  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%d/%m/%Y")+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=13),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.text  = element_text(size = 14)
+  )+
+  labs(x="Date")
 
