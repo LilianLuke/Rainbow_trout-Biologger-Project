@@ -152,7 +152,7 @@ Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 PhysioActData <- Data%>%  
   group_by(#MeasNB,
-    #Swimstyle,
+    Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -168,6 +168,7 @@ PhysioActData <- Data%>%
     LengthMay = first(LengthMay),
     FultonFeb = first(FultonFeb),
     FultonMay = first(FultonMay),
+    SGRMass = first(SGRMass),
     PercentDeltaFulton = first(PercentDeltaFulton),
     greb1l = first(greb1l),
     food = first(food),
@@ -184,7 +185,6 @@ PhysioActData <- Data%>%
   )%>%  
   filter(
     Biologger != "UXL0471DAT", ## This fish was shorter and lighter in may than in february, and I noted it was infected with flavio, so I exlcuded it from the measurements
-    fatmass != "NA", 
   ) %>%
   mutate(
     greb1l = as.factor(greb1l),
@@ -195,31 +195,18 @@ PhysioActData <- Data%>%
   )
 
 
-PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
+PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "High Food",  "low-food" = "Low Food")
+
+
+ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biologger))+
+  facet_wrap(~tank)+
+  geom_point()+
+  geom_path()+
+  scale_color_manual(values = c("gold2", "royalblue"))
 
 
 
-
-
-ggplot(data=PhysioActData, aes(y= mean_AvgEA, x=food, fill= food))+
-  #geom_boxplot()+
-  geom_point(alpha=.2)+
-  stat_summary()+
-  theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("darkgreen", "palegreen2"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic")
-  )+
-  labs(y="Individual average steady swimming AvgEA (mg)")
-
-
-
-ActBodyCorr <- glmmTMB(SGRMass ~ mean_AvgEA*greb1l*food + (1| tank)+ (1| fam), # <= best model 
+ActBodyCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1| tank)+ (1| fam), # <= best model 
                        family= gaussian(),
                        data = PhysioActData)
 
@@ -240,7 +227,7 @@ ggplot(data=PhysioActData23, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))
 
 
-StdPhysioActData <- SwimPhysioActData%>%
+StdPhysioActData <- PhysioActData%>%
   filter(
     Swimstyle == "Steady"
   )
@@ -252,11 +239,11 @@ StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1 | tank) + (1| fam) , #<=
 summary(StdActSGRCorr)
 performance(StdActSGRCorr)
 
-ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
+ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   facet_wrap(~food)+
-  geom_point(aes(col= greb1l))+
-  geom_smooth(method=lm, aes(col="black"))+
-  scale_color_manual(values = c("gold2", "royalblue", "black"), name = "greb1l", labels = c("Summer", "Winter", "Linear regression"))+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))+
   theme_bw(base_size = 16)+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
@@ -265,17 +252,16 @@ ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
         strip.text   = element_text(size = 20, face = "bold"),
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")+
-xlim(0,8)
+  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")
         
 
 
-BrstPhysioActData <- SwimPhysioActData%>%
+BrstPhysioActData <- PhysioActData%>%
   filter(
     Swimstyle == "Dynamic"
   )
 
-BrstActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food*greb1l+ (1 | tank) + (1| fam) , #<= BEST MODEL
+BrstActSGRCorr <- glmmTMB(SGRMass ~ food+ (1 | tank) + (1| fam) , #<= BEST MODEL
                          family= gaussian(),
                          data = BrstPhysioActData)
 
@@ -283,11 +269,11 @@ summary(BrstActSGRCorr)
 performance(BrstActSGRCorr)
 
 
-ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
+ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   facet_wrap(~food)+
-  geom_point(aes(col= greb1l))+
-  geom_smooth(method=lm, aes(col="black"))+
-  scale_color_manual(values = c("gold2", "royalblue", "black"), name = "greb1l", labels = c("Summer", "Winter", "Linear regression"))+
+  geom_point()+
+  geom_smooth(method=lm)+
+  scale_color_manual(values = c("gold2", "royalblue"))+
   theme_bw(base_size = 16)+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
@@ -297,6 +283,7 @@ ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
   labs(x = "Individual average burst swimming AvgEA", y="Specific growth rate (%/day)")
+
 
 
 ActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA*Swimstyle+ (1 | Biologger) , #<= BEST MODEL
@@ -394,7 +381,7 @@ n_distinct(PhysioActData$Biologger)
 ## test if greb, food or activity affects lean mass
 
 
-Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food*greb1l + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
+Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
                      family = gaussian(),
                      data = PhysioActData)
 
@@ -419,31 +406,16 @@ ggplot(
 
 ## fat mass correlates with body size (lean mass)
 
-ModelFat <- lme(log(fatmass) ~ log(leanmass)+mean_AvgEA+food+greb1l,
+ModelFat <- lme(log(fatmass) ~ log(leanmass),
              method = "REML",
              random = list(tank=~1, fam=~1),
-             data = PhysioActData)
+              data = PhysioActData)
 
 hist(resid(ModelFat))
 qqPlot(resid(ModelFat))
 summary(ModelFat)
 anova(ModelFat)
-
-
-ModelFat <- glmmTMB(log(fatmass) ~ log(leanmass)+mean_AvgEA+food*greb1l + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
-                     family = gaussian(),
-                     data = PhysioActData)
-
-performance(ModelFat)
-hist(resid(ModelFat))
-qqPlot(resid(ModelFat))
-summary(ModelFat)
-
-
-
-
-
-
+PhysioActData$resid_fat <- resid(ModelFat)
 
 ggplot(
   data = `PhysioActDayta`, 
@@ -475,34 +447,6 @@ ggplot(
   )+
   labs(y="Fat content in May (%)")+
   ylim(0,17)
-
-
-
-
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = mean_AvgEA, y = leanmass , col=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)+
-  theme_bw(base_size = 16)+
-  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic")
-        
-  )+
-  labs(y="Fat content in May (%)")
-
-
-
 
 
 ggplot(

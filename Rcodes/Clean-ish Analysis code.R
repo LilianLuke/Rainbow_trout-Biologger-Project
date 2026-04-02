@@ -56,9 +56,6 @@ Full_Data <- Full_Data %>%
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
   )%>%
-  select(
-    -Daylength, -DayLength
-    )%>%
   mutate(
     NOAA_Sunrise = as.numeric(NOAA_Sunrise),
          NOAA_Sunset = as.numeric(NOAA_Sunset),
