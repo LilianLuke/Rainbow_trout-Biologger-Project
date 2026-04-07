@@ -139,7 +139,7 @@ Full_Meas_Data_Clean <- Nov_Meas_Data %>%
   )
     
     
-Full_Meas_Data_Clean$Month <- dplyr::recode(Full_Meas_Data_Clean$Month, "Nov" = "2024-11-01",  "Feb" = "2025-02-01",  "May" = "2025-05-01")
+Full_Meas_Data_Clean$Month <- dplyr::recode(Full_Meas_Data_Clean$Month, "Nov" = "2024-11-11",  "Feb" = "2025-02-05",  "May" = "2025-05-17")
     
     
 str(Full_Meas_Data_Clean$Month)
@@ -149,8 +149,6 @@ Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
   mutate(
     Month = as.Date(Month)
   )
-
-Full_Meas_Data_Clean$Month <- factor(Full_Meas_Data_Clean$Month, levels = c("Nov", "Feb", "May"))
 
 n_distinct(Full_Meas_Data_Clean$Biologger)
 
@@ -182,23 +180,6 @@ Full_Meas_Data_Clean$greb1l <- dplyr::recode(Full_Meas_Data_Clean$greb1l, "Allel
 Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food" = "High Food",  "low-food" = "Low Food")
 
 
-ggplot(
-  data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Length),
-) +
-  facet_wrap(~tank)+
-  geom_boxplot(aes(fill=greb1l))+
-  #geom_violin(aes(fill=greb1l))+
-  scale_fill_manual(values = c("gold2", "royalblue"))+
-  geom_smooth(method = "lm")
-
-ggplot(
-  data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Weight),
-) +
-  facet_wrap(~tank)+
-  geom_boxplot(aes(fill=greb1l))+
-  scale_fill_manual(values = c("gold2", "royalblue"))
 
 
 ##There is a trend, see what the GLMM says with month+greb1l*food
@@ -216,6 +197,53 @@ Length <- glmmTMB(log(Length) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (
                   data = Full_Meas_Data_Clean)
 
 summary(Length)
+
+
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Length/10, col=greb1l),
+) +
+  facet_wrap(~food)+
+  geom_point(size=2.3)+
+  #geom_violin(aes(fill=greb1l))+
+  scale_color_manual(values = c("gold2", "royalblue"))+
+  geom_smooth(method = "lm")+
+  theme_bw(base_size = 16)+
+  theme(axis.title.x = element_text(size=20, face = "bold"),
+        axis.title.y = element_text(size=20, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic"),
+  )+
+  labs(x = "Date", y="Body length (cm)")+
+  scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")
+
+ggplot(
+  data = Full_Meas_Data_Clean, 
+  mapping = aes(x = Month, y = Weight, col=greb1l),
+) +
+  facet_wrap(~food)+
+  geom_point(size=2.3)+
+  #geom_violin(aes(fill=greb1l))+
+  scale_color_manual(values = c("gold2", "royalblue"))+
+  geom_smooth(method = "lm")+
+  theme_bw(base_size = 16)+
+  theme(axis.title.x = element_text(size=20, face = "bold"),
+        axis.title.y = element_text(size=20, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16, face = "italic"),
+        legend.text  = element_text(size = 14,face = "italic"),
+  )+
+  labs(x = "Date", y="Body mass (g)")+
+  scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")
+
+
+
 
 ## Note: greb1l:food, p = 0.232 and 0.0744 for weight and length, respectively
 

@@ -188,7 +188,8 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
         legend.title = element_text(size = 20, face = "italic"),
         legend.text  = element_text(size = 18,face = "italic")
   )+
-  labs(y="log(AvgEA) (mg)")
+  labs(y="log(AvgEA) (mg)")+
+  #geom_vline(xintercept = c(as.POSIXct("2025-02-03"), as.POSIXct("2025-02-07")), color="lightblue")
 
 
 

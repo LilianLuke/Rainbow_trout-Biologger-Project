@@ -37,6 +37,8 @@ Temp_Tank23 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_23.xlsx"))
 Temp_Tank24 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_24.xlsx")) 
 Temp_Tank25 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_25.xlsx")) 
 Temp_Tank26 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_26.xlsx"))
+Temp_Tank31 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_31.xlsx"))
+Temp_Tank32 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_32.xlsx"))
 
 Temp_Tank22 <- Temp_Tank22 %>%
   mutate(
@@ -86,6 +88,43 @@ Temp_Tank26 <- Temp_Tank26 %>%
     Date_Time = `Date Time, GMT+02:00`
   )
 
+Temp_Tank31 <- Temp_Tank31 %>%
+  mutate(
+    Tank = as.factor(31),
+  ) %>%
+  rename( 
+    Temp = `Temp, °C (LGR S/N: 20174562, SEN S/N: 20174562)`,
+    Date_Time = `Date Time, GMT+02:00`
+  )%>%
+  mutate(
+    Date = format(Date_Time,"%Y-%m-%d"),
+    Time = format(Date_Time, "%H:%M:%S"),
+    Date = as.Date(Date),
+    Date_Time = as.POSIXct(Date_Time)
+  )%>%
+  filter(
+    Date > "2024-12-12",
+    Date < "2025-01-06"
+  )
+
+Temp_Tank32 <- Temp_Tank32 %>%
+  mutate(
+    Tank = as.factor(32),
+  ) %>%
+  rename( 
+    Temp = `Temp, °C (LGR S/N: 20291672, SEN S/N: 20291672)`,
+    Date_Time = `Date Time, GMT+02:00`
+  )%>%
+  mutate(
+    Date = format(Date_Time,"%Y-%m-%d"),
+    Time = format(Date_Time, "%H:%M:%S"),
+    Date = as.Date(Date),
+    Date_Time = as.POSIXct(Date_Time)
+  )%>%
+  filter(
+    Date > "2024-12-12",
+    Date < "2025-01-06"
+  )
 
 
 
@@ -94,6 +133,8 @@ Full_Temp <- Temp_Tank22 %>%
   bind_rows(Temp_Tank24) %>%
   bind_rows(Temp_Tank25) %>%
   bind_rows(Temp_Tank26) %>%
+  bind_rows(Temp_Tank31) %>%
+  bind_rows(Temp_Tank32) %>%
   mutate(
     Date = format(Date_Time,"%Y-%m-%d"),
     Time = format(Date_Time, "%H:%M:%S"),
@@ -107,9 +148,9 @@ Full_Temp <- Temp_Tank22 %>%
   relocate(Tank)%>%
   relocate(Date_Time, .after = last_col())
 
-Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6")
+Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6",  "31" = "R1",  "32" = "R2")
 
-Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("2", "3", "4", "5","6"))
+Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("R1", "R2", "2", "3", "4", "5","6"))
   
 ggplot(
   data = Full_Temp, 
@@ -129,7 +170,7 @@ ggplot(
         legend.title = element_text(size = 20, face = "bold"),
         legend.text  = element_text(size = 18)
   )+
-  scale_color_colorblind(breaks=c(2, 3, 4, 5, 6))+
+  scale_color_colorblind(breaks=c("R1", "R2", 2, 3, 4, 5, 6))+
   labs(x="Date & Time", y="Water temperature (°C)")
 
 
@@ -157,7 +198,7 @@ Full_Temp_DL <- Full_Temp_DL %>%
     NOAA_Sunset = Sunset,
   )
 
-str(Full_Temp_DLTest$Time)
+str(Full_Temp_DL$Time)
 
 ### Calculate Daylength
 Full_Temp_DL <- Full_Temp_DL %>% 
@@ -207,27 +248,32 @@ Full_Temp_DL <- Full_Temp_DL %>%
   filter(
     Date < "2025-05-20"
   )
+  
 
-Scale_factor = 24/max(Full_Temp_DL$Temp)
+Scale_factor = 23/max(Full_Temp_DL$Temp)
 
 
 ggplot(DayLengthPlot, aes(x = Date)) +
   geom_col(aes(width=87000, y = hours, fill = Period)) +
-  scale_fill_manual(values = c("Night" = "midnightblue", "Day" = "#FFEBCD")) +
+  scale_fill_manual(breaks = c("Day", "Night"), values = c("Day" = "#FFEBCD", "Night" = "midnightblue")) +
   geom_line(data=Full_Temp_DL, aes(x = Date_Time, y = Scale_factor*Temp, col = Tank))+
   scale_y_continuous(
     name = "Day length (h)",
-    sec.axis=sec_axis(transform = ~./scale, name = "Temperature (°C)"))+
+    sec.axis=sec_axis(transform = ~./Scale_factor, name = "Temperature (°C)"),
+    expand = c(0, 0)
+    )+
   theme_bw()+
-  scale_x_datetime(date_breaks = "2 weeks", date_labels = "%d/%m/%Y")+
+  scale_x_datetime(date_breaks = "3 weeks", date_labels = "%d/%m/%Y", expand = c(0,0))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=13),
+        axis.text.x = element_text(size=15),
         axis.text.y = element_text(size=18),
         strip.text   = element_text(size = 20, face = "bold"),
         legend.position = "bottom",
         legend.title = element_text(size = 16, face = "bold"),
-        legend.text  = element_text(size = 14)
+        legend.text  = element_text(size = 14),
+        panel.margin = unit(-0.8, "lines")
   )+
-  labs(x="Date")
+  labs(x="Date")+
+  geom_vline(xintercept = c(as.POSIXct("2024-12-09"),as.POSIXct("2024-12-12"), as.POSIXct("2025-01-06"), as.POSIXct("2025-01-14")), color=c("red", "red","grey", "green"))
 

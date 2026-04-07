@@ -150,9 +150,9 @@ str(Data)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
-PhysioActData <- Data%>%  
+PhysioActDataSwim <- Data%>%  
   group_by(#MeasNB,
-    #Swimstyle,
+    Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -195,7 +195,7 @@ PhysioActData <- Data%>%
   )
 
 
-PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "High Food",  "low-food" = "Low Food")
+PhysioActDataSwim$food <- dplyr::recode(PhysioActDataSwim$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 
 
 ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biologger))+
@@ -208,7 +208,7 @@ ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biolog
 
 ActBodyCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1| tank)+ (1| fam), # <= best model 
                        family= gaussian(),
-                       data = PhysioActData)
+                       data = PhysioActDataSwim)
 
 performance(ActBodyCorr)
 hist(resid(ActBodyCorr))
@@ -236,7 +236,7 @@ ggplot(data=PhysioActData23, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))
 
 
-StdPhysioActData <- PhysioActData%>%
+StdPhysioActData <- PhysioActDataSwim%>%
   filter(
     Swimstyle == "Steady"
   )
@@ -248,10 +248,10 @@ StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1 | tank) + (1| fam) , #<=
 summary(StdActSGRCorr)
 performance(StdActSGRCorr)
 
-ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
   facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)+
+  geom_point(aes(col=greb1l))+
+  geom_smooth(method=lm, col="black")+
   scale_color_manual(values = c("gold2", "royalblue"))+
   theme_bw(base_size = 16)+
   theme(axis.title.x = element_text(size=18, face = "bold"),
@@ -261,16 +261,17 @@ ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
         strip.text   = element_text(size = 20, face = "bold"),
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")
+  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")+
+  xlim(0,8)
         
 
 
-BrstPhysioActData <- PhysioActData%>%
+BrstPhysioActData <- PhysioActDataSwim%>%
   filter(
     Swimstyle == "Dynamic"
   )
 
-BrstActSGRCorr <- glmmTMB(SGRMass ~ food+ (1 | tank) + (1| fam) , #<= BEST MODEL
+BrstActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food+ (1 | tank) + (1| fam) , #<= BEST MODEL
                          family= gaussian(),
                          data = BrstPhysioActData)
 
@@ -278,10 +279,10 @@ summary(BrstActSGRCorr)
 performance(BrstActSGRCorr)
 
 
-ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
   facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)+
+  geom_point(aes(col=greb1l))+
+  geom_smooth(method=lm, col="black")+
   scale_color_manual(values = c("gold2", "royalblue"))+
   theme_bw(base_size = 16)+
   theme(axis.title.x = element_text(size=18, face = "bold"),
