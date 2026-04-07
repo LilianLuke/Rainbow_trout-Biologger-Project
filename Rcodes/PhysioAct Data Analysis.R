@@ -150,9 +150,9 @@ str(Data)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
-PhysioActDataSwim <- Data%>%  
+PhysioActData <- Data%>%  
   group_by(#MeasNB,
-    Swimstyle,
+    #Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -195,7 +195,7 @@ PhysioActDataSwim <- Data%>%
   )
 
 
-PhysioActDataSwim$food <- dplyr::recode(PhysioActDataSwim$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
+PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 
 
 ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biologger))+
@@ -444,8 +444,7 @@ ggplot(
 ) +
   geom_boxplot()+
   theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
-  scale_x_discrete(name = "Food Treatment", labels = c("High Food", "Low Food"))+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
         axis.text.x = element_text(size=16),
@@ -455,7 +454,7 @@ ggplot(
         legend.text  = element_text(size = 14,face = "italic")
         
   )+
-  labs(y="Fat content in May (%)")+
+  labs(x="Food treatment", y="Fat content in May (%)")+
   ylim(0,17)
 
 
@@ -465,8 +464,7 @@ ggplot(
 ) +
   geom_boxplot()+
   theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
-  scale_x_discrete(name = "Food Treatment", labels = c("High Food", "Low Food"))+
+  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
         axis.text.x = element_text(size=16),
@@ -476,7 +474,7 @@ ggplot(
         legend.text  = element_text(size = 14,face = "italic")
         
   )+
-  labs(y="Lean mass in May (g)")+
+  labs(x="Food treatment", y="Lean mass in May (g)")+
   ylim(0, 600)
 
 ### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group

@@ -177,7 +177,7 @@ ggplot(
 ## Looks like there is a greb effect in food-restricted ;/ 
 
 Full_Meas_Data_Clean$greb1l <- dplyr::recode(Full_Meas_Data_Clean$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
-Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food" = "High Food",  "low-food" = "Low Food")
+Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 
 
 
@@ -209,14 +209,14 @@ ggplot(
   #geom_violin(aes(fill=greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")+
-  theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=20, face = "bold"),
-        axis.title.y = element_text(size=20, face = "bold"),
+  theme_bw(base_size = 20)+
+  theme(axis.title.x = element_text(size=24, face = "bold"),
+        axis.title.y = element_text(size=24, face = "bold"),
         axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"),
+        axis.text.y = element_text(size=22),
+        strip.text   = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
   )+
   labs(x = "Date", y="Body length (cm)")+
   scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")
@@ -231,13 +231,13 @@ ggplot(
   scale_color_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")+
   theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=20, face = "bold"),
-        axis.title.y = element_text(size=20, face = "bold"),
+  theme(axis.title.x = element_text(size=24, face = "bold"),
+        axis.title.y = element_text(size=24, face = "bold"),
         axis.text.x = element_text(size=18),
         axis.text.y = element_text(size=18),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"),
+        strip.text   = element_text(size = 24, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
   )+
   labs(x = "Date", y="Body mass (g)")+
   scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")

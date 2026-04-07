@@ -70,7 +70,7 @@ Full_Data$food <- factor(Full_Data$food, levels = c("high-food", "low-food"))
 
 Full_Data$MeasNB <- factor(Full_Data$MeasNB, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"))
 
-Full_Data$food <- dplyr::recode(Full_Data$food, "high-food" = "High Food",  "low-food" = "Low Food")
+Full_Data$food <- dplyr::recode(Full_Data$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 Full_Data$Swimstyle <- dplyr::recode(Full_Data$Swimstyle, "Dynamic" = "Active Swimming",  "Steady" = "Steady Swimming")
 
 
@@ -179,7 +179,7 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
   geom_point(alpha=.1)+
   geom_smooth()+
   theme_bw(base_size = 16)+
-  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
+  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
         axis.text.x = element_text(size=18),
@@ -188,7 +188,7 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
         legend.title = element_text(size = 20, face = "italic"),
         legend.text  = element_text(size = 18,face = "italic")
   )+
-  labs(y="log(AvgEA) (mg)")+
+  labs(y="log(AvgEA) (mg)")
   #geom_vline(xintercept = c(as.POSIXct("2025-02-03"), as.POSIXct("2025-02-07")), color="lightblue")
 
 
