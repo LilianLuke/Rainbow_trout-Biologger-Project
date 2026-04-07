@@ -55,4 +55,4 @@ po/*~
 rsconnect/
 
 # plots
-*.png
+Plots/
