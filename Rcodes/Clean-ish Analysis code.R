@@ -170,7 +170,7 @@ EMMF2 <- emmeans(GAMMAvg2, ~Swimstyle:greb1l:food, data=Full_Data_GAMM)
 EMM_respF2 <- regrid(EMMF2)
 pairs(EMM_respF2, adjust="none")
 
-
+pairs(emmeans(GAMMAvg2, ~ greb1l | food+Swimstyle, type = "response"))
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
   

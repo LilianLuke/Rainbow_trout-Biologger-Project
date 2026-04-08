@@ -28,11 +28,9 @@ library(tools)
 library(ggeffects)
 
 
-setwd(Path_Meas)
-
 ##read the file from the Xray machine with all the info  
 
-Xray_data <- read.xlsx("Biologger_x-ray_data.xlsx")
+Xray_data <- read.xlsx(paste0(path_meas, "Biologger_x-ray_data.xlsx"))
 
 ## rename and select useful columns
 Xray_data <- Xray_data %>%

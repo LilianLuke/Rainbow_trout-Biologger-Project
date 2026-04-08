@@ -11,6 +11,7 @@ library(openxlsx)
 library(ggplot2)
 library(ggeffects)
 library(glmmTMB)
+library(emmeans)
 
 
 ## Step 1: Load the complete dataset, as it contains meausrements for february and may already.
@@ -191,13 +192,31 @@ Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (
                       data = Full_Meas_Data_Clean)
 
 summary(Weight)
+Weightqr <- simulateResiduals(fittedModel = Weight, plot = FALSE)
+Weightqr$scaledResiduals
+plotQQunif(Weightqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
+pairs(emmeans(Weight, "food", type = "response"))
+pairs(emmeans(Weight, ~ greb1l | food, type = "response"))
+
+
+
 
 Length <- glmmTMB(log(Length) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(), 
                   data = Full_Meas_Data_Clean)
 
 summary(Length)
-
+Lengthqr <- simulateResiduals(fittedModel = Length, plot = FALSE)
+Lengthqr$scaledResiduals
+plotQQunif(Lengthqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
+pairs(emmeans(Length, "food", type = "response"))
+pairs(emmeans(Length, ~ greb1l | food, type = "response"))
 
 
 ggplot(

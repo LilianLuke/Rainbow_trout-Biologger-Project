@@ -205,35 +205,12 @@ ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biolog
   scale_color_manual(values = c("gold2", "royalblue"))
 
 
-
-ActBodyCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1| tank)+ (1| fam), # <= best model 
-                       family= gaussian(),
-                       data = PhysioActDataSwim)
-
-performance(ActBodyCorr)
-hist(resid(ActBodyCorr))
-qqPlot(resid(ActBodyCorr))
-summary(ActBodyCorr)
-
-
-
-ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=food, fill= greb1l))+
-  geom_boxplot()+
-  geom_smooth(method=lm)+
-  scale_fill_manual(values = c("gold2", "royalblue"))
-
-
-
-ggplot(data=PhysioActData, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
+ggplot(data=PhysioActDataSwim, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
   facet_wrap(~Swimstyle+food)+
   geom_point()+
   geom_smooth(method=lm)+
   scale_color_manual(values = c("gold2", "royalblue"))
 
-ggplot(data=PhysioActData23, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
-  geom_point()+
-  geom_smooth(method=lm)+
-  scale_color_manual(values = c("gold2", "royalblue"))
 
 
 StdPhysioActData <- PhysioActDataSwim%>%
@@ -247,6 +224,15 @@ StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1 | tank) + (1| fam) , #<=
 
 summary(StdActSGRCorr)
 performance(StdActSGRCorr)
+
+SGRqr <- simulateResiduals(fittedModel = StdActSGRCorr, plot = FALSE)
+SGRqr$scaledResiduals
+plotQQunif(SGRqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
+
+
 
 ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
   facet_wrap(~food)+
@@ -265,7 +251,13 @@ ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
   xlim(0,8)
         
 
-
+ggplot(data=PhysioActData, aes(y=WeightFeb, x=SGRMass, col=greb1l))+
+  facet_wrap(~food)+
+  geom_point()
+  geom_smooth(method = lm)
+  
+  
+  
 BrstPhysioActData <- PhysioActDataSwim%>%
   filter(
     Swimstyle == "Dynamic"
@@ -277,7 +269,12 @@ BrstActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food+ (1 | tank) + (1| fam) , #<=
 
 summary(BrstActSGRCorr)
 performance(BrstActSGRCorr)
-
+SGRqr <- simulateResiduals(fittedModel = BrstActSGRCorr, plot = FALSE)
+SGRqr$scaledResiduals
+plotQQunif(SGRqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
 
 ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
   facet_wrap(~food)+
@@ -293,16 +290,6 @@ ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
   labs(x = "Individual average burst swimming AvgEA", y="Specific growth rate (%/day)")
-
-
-
-ActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA*Swimstyle+ (1 | Biologger) , #<= BEST MODEL
-                       family= gaussian(),
-                       data = PhysioActData)
-
-summary(ActSGRCorr)
-performance(ActSGRCorr)
-
 
 
 SteadyActLF <- SteadyActData %>%
@@ -391,9 +378,9 @@ n_distinct(PhysioActData$Biologger)
 ## test if greb, food or activity affects lean mass
 
 
-Modellean <- glmmTMB(leanmass ~ log(mean_AvgEA)*food + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
+Modellean <- glmmTMB(leanmass ~ mean_AvgEA*food + (1 | tank) + (1| fam), #<= BEST MODEL (actually, best model does not include mean AvgEA but we want to show that p-value)
                      family = gaussian(),
-                     data = PhysioActData)
+                     data = StdPhysioActData)
 
 performance(Modellean)
 hist(resid(Modellean))
@@ -416,16 +403,16 @@ ggplot(
 
 ## fat mass correlates with body size (lean mass)
 
-ModelFat <- lme(log(fatmass) ~ log(leanmass),
-             method = "REML",
-             random = list(tank=~1, fam=~1),
-              data = PhysioActData)
+ModelFat <- lme(log(fatmass) ~ log(leanmass)+food,
+                method = "REML",
+                random = list(tank=~1, fam=~1),
+                data = PhysioActData,
+                na.action = na.omit)
 
 hist(resid(ModelFat))
 qqPlot(resid(ModelFat))
 summary(ModelFat)
 anova(ModelFat)
-PhysioActData$resid_fat <- resid(ModelFat)
 
 ggplot(
   data = `PhysioActDayta`, 
