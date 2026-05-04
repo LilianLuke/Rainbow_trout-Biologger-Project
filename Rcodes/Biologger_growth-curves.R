@@ -186,11 +186,16 @@ Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food
 ##There is a trend, see what the GLMM says with month+greb1l*food
 
 
+Weight <- glmmTMB(log(Weight) ~ Month*greb1l*food,
+                  family = gaussian(),
+                  data = Full_Meas_Data_Clean)
+
+step(Weight)
 
 Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
                       family = gaussian(),
                       data = Full_Meas_Data_Clean)
-
+performance(Weight)
 summary(Weight)
 Weightqr <- simulateResiduals(fittedModel = Weight, plot = FALSE)
 Weightqr$scaledResiduals
@@ -202,6 +207,22 @@ pairs(emmeans(Weight, "food", type = "response"))
 pairs(emmeans(Weight, ~ greb1l | food, type = "response"))
 
 
+
+ggplot(data=Full_Meas_Data_Clean, aes(y=Weight, x=Month, group = tank, col= tank))+ 
+  facet_wrap(~food)+
+  geom_point()+
+  xlab("AvgEA (mg)") + 
+  ylab("Residuals")+ 
+  geom_smooth(method = "lm", 
+              se = FALSE)
+
+
+
+Length <- glmmTMB(log(Length) ~ Month*greb1l*food,
+                  family = gaussian(),
+                  data = Full_Meas_Data_Clean)
+
+step(Length)
 
 
 Length <- glmmTMB(log(Length) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
@@ -217,7 +238,7 @@ plotQQunif(Lengthqr,
            testDispersion = TRUE)
 pairs(emmeans(Length, "food", type = "response"))
 pairs(emmeans(Length, ~ greb1l | food, type = "response"))
-
+performance(Length)
 
 ggplot(
   data = Full_Meas_Data_Clean, 

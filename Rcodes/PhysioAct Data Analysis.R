@@ -218,14 +218,40 @@ StdPhysioActData <- PhysioActDataSwim%>%
     Swimstyle == "Steady"
   )
 
-StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food + (1 | tank) + (1| fam) , #<= BEST MODEL
+StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA*greb1l*food + (1 | tank) + (1| fam) , #<= BEST MODEL
                       family= gaussian(),
                       data = StdPhysioActData)
 
-summary(StdActSGRCorr)
-performance(StdActSGRCorr)
 
-SGRqr <- simulateResiduals(fittedModel = StdActSGRCorr, plot = FALSE)
+drop1(StdActSGRCorr)
+step(StdActSGRCorr)
+
+BestStdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA + food + (1| tank) + (1| fam) , #<= BEST MODEL
+                         family= gaussian(),
+                         data = StdPhysioActData)
+
+StdPhysioActData <- StdPhysioActData%>%
+  filter(
+    SGRMass != "NA"
+  )
+
+
+E1 <- resid(BestStdActSGRCorr)
+StdPhysioActData$E1 <- E1
+
+ggplot(data=StdPhysioActData, aes(y=E1, x=mean_AvgEA, group = tank, col= tank))+
+  geom_point()+
+  xlab("AvgEA (mg)") + 
+  ylab("Residuals")+ 
+  geom_smooth(method = "lm", 
+              se = FALSE)
+
+
+
+summary(BestStdActSGRCorr)
+performance(BestStdActSGRCorr)
+
+SGRqr <- simulateResiduals(fittedModel = BestStdActSGRCorr, plot = FALSE)
 SGRqr$scaledResiduals
 plotQQunif(SGRqr, 
            testUniformity = TRUE, 
