@@ -203,18 +203,18 @@ performance(GAMMAvg)
 summary(GAMMAvg)
 AIC(GAMMAvg)
 
-EMMF <- emmeans(GAMMAvg, ~Swimstyle:food_greb, data=Full_Data_GAMM) 
-EMM_respF <- regrid(EMMF2)
-pairs(EMM_respF, adjust="none")
+pairs(emmeans(GAMMAvg, ~ greb1l | food * Swimstyle, type = "response"), adjust="sidak")
+# the "adjust" argument does not work, compute p-values adjustment manually with sidak method: p-adj = 1-(1-p)^4 (for 4 tests)
 
-pairs(emmeans(GAMMAvg2, ~ greb1l | food+Swimstyle, type = "response"))
+
+
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
 par(mfrow = c(2, 4) ) 
-ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
-  facet_wrap(~food+Swimstyle)+
+ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
+  facet_wrap(~Swimstyle+food)+
   geom_point(alpha=.1)+
-  geom_smooth()+
+  geom_smooth(linewidth = .8)+
   theme_bw(base_size = 16)+
   scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
@@ -225,7 +225,8 @@ ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
         legend.title = element_text(size = 20, face = "italic"),
         legend.text  = element_text(size = 18,face = "italic")
   )+
-  labs(y="log(AvgEA) (mg)")
+  labs(y="log(AvgEA) (mg)")+
+  ylim(0,15)
   #geom_vline(xintercept = c(as.POSIXct("2025-02-03"), as.POSIXct("2025-02-07")), color="lightblue")
 
 

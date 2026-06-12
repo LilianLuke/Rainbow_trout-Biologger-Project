@@ -12,6 +12,8 @@ library(ggplot2)
 library(ggeffects)
 library(glmmTMB)
 library(emmeans)
+library(performance)
+library(DHARMa)
 
 
 ## Step 1: Load the complete dataset, as it contains meausrements for february and may already.
@@ -196,15 +198,15 @@ Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (
                       family = gaussian(),
                       data = Full_Meas_Data_Clean)
 performance(Weight)
-summary(Weight)
 Weightqr <- simulateResiduals(fittedModel = Weight, plot = FALSE)
 Weightqr$scaledResiduals
 plotQQunif(Weightqr, 
            testUniformity = TRUE, 
            testOutliers = TRUE, 
            testDispersion = TRUE)
-pairs(emmeans(Weight, "food", type = "response"))
-pairs(emmeans(Weight, ~ greb1l | food, type = "response"))
+
+summary(Weight)
+pairs(regrid(emmeans(Weight, ~ greb1l | food, type = "response")), ajust="Tukey")
 
 
 
@@ -218,27 +220,28 @@ ggplot(data=Full_Meas_Data_Clean, aes(y=Weight, x=Month, group = tank, col= tank
 
 
 
-Length <- glmmTMB(log(Length) ~ Month*greb1l*food,
+Length <- glmmTMB(log(Length/10) ~ Month*greb1l*food,
                   family = gaussian(),
                   data = Full_Meas_Data_Clean)
 
 step(Length)
-
-
-Length <- glmmTMB(log(Length) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
+# Step() does not work if I add random factors, so I do it without first and it usually works
+# In this case, I find that when including random factors, it is better to keep Month:Food, even though the Step() says it should be dropped
+Length <- glmmTMB(log(Length/10) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(), 
                   data = Full_Meas_Data_Clean)
 
-summary(Length)
+performance(Length)
 Lengthqr <- simulateResiduals(fittedModel = Length, plot = FALSE)
 Lengthqr$scaledResiduals
 plotQQunif(Lengthqr, 
            testUniformity = TRUE, 
            testOutliers = TRUE, 
            testDispersion = TRUE)
-pairs(emmeans(Length, "food", type = "response"))
-pairs(emmeans(Length, ~ greb1l | food, type = "response"))
-performance(Length)
+
+summary(Length)
+pairs(emmeans(Length, ~ greb1l | food, type = "response"),ajust="Tukey")
+
 
 ggplot(
   data = Full_Meas_Data_Clean, 
