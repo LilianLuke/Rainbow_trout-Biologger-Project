@@ -1,3 +1,4 @@
+### This script was used to analyse accelerometry data ###
 
 library(dplyr)
 library(lubridate)
@@ -21,24 +22,10 @@ library(hms)
 
 source("path_file_lilian.R")
 
-Full_Data <- read_xlsx(paste0(path.data, "Biologger final data.xlsx"))
+Full_Data <- read_xlsx(paste0(path.data, "Biologger final data.xlsx")) #open dataset
 
 str(Full_Data)
 
-Full_DataTest <- Full_Data %>%
-  mutate(
-    Time = lubridate::hms(Time),
-    NOAA_Sunrise = lubridate::hms(NOAA_Sunrise),
-    NOAA_Sunset = lubridate::hms(NOAA_Sunset),
-  )%>%
-  mutate(
-    NOAA_Sunrise = as.numeric(NOAA_Sunrise),
-    NOAA_Sunset = as.numeric(NOAA_Sunset),
-    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins"),
-    Time = hms::hms(Time),
-    NOAA_Sunrise = hms::hms(NOAA_Sunrise),
-    NOAA_Sunset = hms::hms(NOAA_Sunset),
-  )
 ## Some variable ar as chr or num when we want them to be factors or dates or whatever, so it needs a bit of formatting
 
 Full_Data <- Full_Data %>%
@@ -70,11 +57,13 @@ Full_Data <- Full_Data %>%
   mutate(
     NOAA_Sunrise = as.numeric(NOAA_Sunrise),
     NOAA_Sunset = as.numeric(NOAA_Sunset),
-    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins"),
+    DayLength = difftime(NOAA_Sunset, NOAA_Sunrise, units = "mins"), #calculate duration of daylight according to NOAA values (previously added to the dataset)
     Time = hms::hms(Time),
     NOAA_Sunrise = hms::hms(NOAA_Sunrise),
     NOAA_Sunset = hms::hms(NOAA_Sunset),
   )
+
+### Next we do a little more formatting so that plots look ok
 
 Full_Data$Light <- factor(Full_Data$Light, levels = c("Night", "Day"))
 Full_Data$Season <- factor(Full_Data$Season, levels = c("Winter", "Spring"))
@@ -85,85 +74,6 @@ Full_Data$MeasNB <- factor(Full_Data$MeasNB, levels = c("1", "2", "3", "4", "5",
 Full_Data$food <- dplyr::recode(Full_Data$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 Full_Data$Swimstyle <- dplyr::recode(Full_Data$Swimstyle, "Dynamic" = "Burst Swimming",  "Steady" = "Steady Swimming")
 
-
-
-ggplot(data = Full_Data, aes(y = AvgEA, x = Biologger)) + 
-  geom_boxplot(alpha = 0.5,
-               color="darkblue", 
-               fill="lightblue") +
-  xlab("Biologger") + 
-  ylab("AvgEA") +
-  theme(text = element_text(size = 15),
-        axis.text.x = element_text(angle = 30, vjust = 0.5, hjust = 1)) 
-
-
-
-
-StdFull_Data <- Full_Data %>%
-  filter(
-    Swimstyle == "Steady Swimming"
-  )
-
-
-hist(StdFull_Data$AvgEA, breaks=50)
-
-
-BrstFull_Data <- Full_Data %>%
-  filter(
-    Swimstyle == "Burst Swimming"
-  )
-
-
-hist(BrstFull_Data$AvgEA, breaks=500)
-
-
-
-## Plot temperature data over time
-
-ggplot(data=Full_Data, aes(y= Temp, x=MeasNB, col=tank))+
-  geom_point(alpha=.01)+
-  geom_smooth(method="gam")+
-  theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=20, face = "bold"),
-        axis.title.y = element_text(size=20, face = "bold"),
-        axis.text.x = element_text(size=20),
-        axis.text.y = element_text(size=20),
-  )+
-  labs(y="Temperature (°C)")+
-  ylim(0,8)
-
-
-
-Avg1 <- glmmTMB(AvgEA ~ Light*Season*food*greb1l+ (1 | tank/Biologger) + (1 | fam),
-              family = Gamma(link="log"), 
-              data = Full_Data)
-#performance(Avg1)
-summary(Avg1)
-
-
-## Test the Light*Season effect 
-
-Avg2 <- glmmTMB(AvgEA ~ Light*Season+food+greb1l+ (1 | tank/Biologger) + (1| fam),
-              family = Gamma(link="log"), 
-              data = Full_Data)
-#performance(Avg2)
-summary(Avg2)
-
-ggplot(Full_Data_Out, aes(x = Light, y = log(AvgEA)))+
-  facet_wrap(~Season)+
-  geom_boxplot()
-
-
-## No interaction between light and season, no nesting needed
-
-Avg3 <- glmmTMB(AvgEA ~ Light*food*greb1l+ (1 | tank/Biologger) + (1| fam),
-              family = Gamma(link="log"), 
-              data = Full_Data)
-
-#performance(Avg3)
-summary(Avg3)
-
-## Season*food interaction, expected since feeding is different between seasons
 
 ## Try GAMM with Date 
 
@@ -179,42 +89,39 @@ Full_Data_GAMM <- Full_Data %>%
 contrasts(Full_Data_GAMM$food_greb) <- "contr.treatment"
 ## apparently, bam() is better for big datasets, so try that first
 ## sources : 
-## https://research.reading.ac.uk/psylinglab/wp-content/uploads/sites/25/2023/06/Learn-Generalised-Additive-Mixed-Models.pdf
-## https://stats.stackexchange.com/questions/633116/gamm-using-mgcv-in-r-by-participant-random-effects-for-categorical-variables
-## https://drmowinckels.io/blog/2018/gamm-random-effects/#:~:text=Explore%20the%20use%20of%20Generalized%20Additive%20Mixed%20Models,walks%20through%20a%20detailed%20example%20with%20simulated%20data.
+## 1) https://research.reading.ac.uk/psylinglab/wp-content/uploads/sites/25/2023/06/Learn-Generalised-Additive-Mixed-Models.pdf
+## 2) https://stats.stackexchange.com/questions/633116/gamm-using-mgcv-in-r-by-participant-random-effects-for-categorical-variables
+## 3) https://drmowinckels.io/blog/2018/gamm-random-effects/#:~:text=Explore%20the%20use%20of%20Generalized%20Additive%20Mixed%20Models,walks%20through%20a%20detailed%20example%20with%20simulated%20data.
 
-## I had doubt on whether I should add biologger as a random intercept  s(Biologger, bs = "re") or random smooth s(Date, Biologger, bs = "fs"), so I tried both and random smooth was better
 ## k was set to 20 because there are ~20 measurements periods (20*24hrs)
 
 
-GAMMAvg <- bam(AvgEA ~ food*greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Biologger, bs = "re") + s(tank, bs="re") + s(fam, bs="re") + s(LengthFeb, bs="re"),
+GAMMAvg <- bam(AvgEA ~ food*greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Biologger, bs = "re") + s(food,tank, bs="re") + s(fam, bs="re"),
                 family = Gamma(link = "log"),
                 data = Full_Data_GAMM)
 
 gam.check(GAMMAvg)
-concurvity(GAMMAvg)
+concurvity(GAMMAvg, full=FALSE)
 performance(GAMMAvg)
-
-## Note : I did not find a way to nest tank/Biologger as random, especially with that smooth thing, but I think that's okay as it is?
-### => it is actually not necessary to nest tank/Biologger if all Biologgers are differents
+### => model performance are okay-ish, the plots don't look that great but I guess accelerometery data is a bit tricky 
+## Note : => it is not necessary to nest tank/Biologger if all Biologgers are differents
 ### Necessary only if fish in different tanks have the same ID, to tell the model, e.g., that fish 1 in tank 1 is not the same as fish 1 in tank 2
-
+### Nesting tank in food doesn't change anything either, so I guess it can stay this way.
 
 summary(GAMMAvg)
 AIC(GAMMAvg)
 
 pairs(emmeans(GAMMAvg, ~ greb1l | food * Swimstyle, type = "response"), adjust="sidak")
-# the "adjust" argument does not work, compute p-values adjustment manually with sidak method: p-adj = 1-(1-p)^4 (for 4 tests)
+# the "adjust" argument does not work, so I computed p-values adjustment manually, with sidak method: p-adj = 1-(1-p)^n (for n=4 tests)
 
 
 
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
-## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1, p.24)
-par(mfrow = c(2, 4) ) 
-ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
+## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1), p.24)
+ggplot(data=Full_Data, aes(y= log(AvgEA), x=Date, col= greb1l))+
   facet_wrap(~Swimstyle+food)+
-  geom_point(alpha=.1)+
-  geom_smooth(linewidth = .8)+
+  geom_point(alpha=.06)+
+  geom_smooth(linewidth = 1.2, formula = y ~ s(x, k = 20))+
   theme_bw(base_size = 16)+
   scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_text(size=18, face = "bold"),
@@ -225,16 +132,35 @@ ggplot(data=Full_Data, aes(y= AvgEA, x=Date, col= greb1l))+
         legend.title = element_text(size = 20, face = "italic"),
         legend.text  = element_text(size = 18,face = "italic")
   )+
-  labs(y="log(AvgEA) (mg)")+
-  ylim(0,15)
+  labs(y="log(AvgEA) (mg)")
   #geom_vline(xintercept = c(as.POSIXct("2025-02-03"), as.POSIXct("2025-02-07")), color="lightblue")
 
+### Here I wanted to focus on this Steady Swimming + food Restricted group to see what the possible genotype effect looks like
+StdRestr_Data <- Full_Data%>%
+  filter(
+    food=="Restricted",
+    Swimstyle=="Steady Swimming"
+  )
 
+ggplot(data=StdRestr_Data, aes(y= AvgEA, x=Date, col= food))+
+  geom_point(alpha=.05)+
+  geom_smooth(linewidth = 1.2, formula = y ~ s(x, k = 20))+
+  theme_bw(base_size = 16)+
+  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic")
+  )+
+  labs(y="AvgEA (mg)")
 ## Just to make sure that there is an actual difference between allele 1 and 2 in low food, I ran gamm() separately in both food groups
 
-Full_Data_GAMM_HighFood <- Full_Data_GAMM %>% 
+Full_Data_GAMM_Std <- Full_Data_GAMM %>% 
   filter(
-    food == "High Food"
+    Swimstyle=="Steady Swimming"
   )
 
 
@@ -247,20 +173,20 @@ Full_Data_GAMM_LowFood <- Full_Data_GAMM %>%
 ## Let's do low food first
 
 
-GAMMAvgLF <- bam(AvgEA ~ greb1l*Swimstyle + Light +  s(Date, k=20) + s(Date, by=greb1l, k=20)+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
+GAMMAvgStd <- bam(AvgEA ~ greb1l*food + Light +  s(Date, k=20) + s(Date, by=greb1l, k=20)+ s(Biologger, bs = "re")+ s(tank, bs="re") + s(fam, bs="re"),
                   family = Gamma(link = "log"),
-                  data = Full_Data_GAMM_LowFood)
+                  data = Full_Data_GAMM_Std)
 
-performance(GAMMAvgLF)
-gam.check(GAMMAvgLF)
-concurvity(GAMMAvgLF)
-summary(GAMMAvgLF)
-
+performance(GAMMAvgStd)
+gam.check(GAMMAvgStd)
+concurvity(GAMMAvgStd)
+summary(GAMMAvgStd)
+AIC(GAMMAvgStd)
 ##Adding the greb*swim interaction improves the model quite a lot
 
-EMMF2 <- emmeans(GAMMAvgLF, ~greb1l:Swimstyle, data=Full_Data_GAMM_LowFood) 
+EMMF2 <- emmeans(GAMMAvgStd, ~greb1l:food, data=Full_Data_GAMM_Std) 
 EMM_respF2 <- regrid(EMMF2)
-pairs(EMM_respF2, adjust="none")
+pairs(EMM_respF2, adjust="Sidak")
 
 
 

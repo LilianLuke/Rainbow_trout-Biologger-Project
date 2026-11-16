@@ -10,6 +10,7 @@ library(writexl)
 library(openxlsx)
 library(ggplot2)
 library(ggeffects)
+library(cowplot)
 library(glmmTMB)
 library(emmeans)
 library(performance)
@@ -242,52 +243,63 @@ plotQQunif(Lengthqr,
 summary(Length)
 pairs(emmeans(Length, ~ greb1l | food, type = "response"),ajust="Tukey")
 
+par(mfrow = c(2, 1)) 
 
-ggplot(
+length <- ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Length/10, col=greb1l),
 ) +
   facet_wrap(~food)+
-  geom_point(size=2.3)+
+  geom_point(size=2.3, alpha=.5)+
   #geom_violin(aes(fill=greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")+
   theme_bw(base_size = 20)+
-  theme(axis.title.x = element_text(size=24, face = "bold"),
-        axis.title.y = element_text(size=24, face = "bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=22),
-        strip.text   = element_text(size = 24, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic"),
+  theme(axis.title.x = element_text(size=20, face = "bold", margin = margin(t=15)),
+        axis.title.y = element_text(size=20, face = "bold", margin = margin(r=15)),
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 18, face = "italic"),
+        legend.text  = element_text(size = 16,face = "italic"),
+        legend.position = "none"
   )+
   labs(x = "Date", y="Body length (cm)")+
-  scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")
+  scale_x_date(limits = as.Date(c("2024-11-01", "2025-05-31")), breaks = as.Date(c("2024-11-01", "2025-02-01", "2025-05-01")), date_labels = "%b %y")
 
-ggplot(
+mass <- ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight, col=greb1l),
 ) +
   facet_wrap(~food)+
-  geom_point(size=2.3)+
+  geom_point(size=2.3, alpha=.5)+
   #geom_violin(aes(fill=greb1l))+
   scale_color_manual(values = c("gold2", "royalblue"))+
   geom_smooth(method = "lm")+
   theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=24, face = "bold"),
-        axis.title.y = element_text(size=24, face = "bold"),
-        axis.text.x = element_text(size=18),
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size=20, face = "bold", margin = margin(r=15)),
+        axis.text.x = element_text(size=16),
         axis.text.y = element_text(size=18),
-        strip.text   = element_text(size = 24, face = "bold"),
-        legend.title = element_text(size = 20, face = "italic"),
-        legend.text  = element_text(size = 18,face = "italic"),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 18, face = "italic"),
+        legend.text  = element_text(size = 16,face = "italic"),
+        legend.position = "none"
   )+
   labs(x = "Date", y="Body mass (g)")+
-  scale_x_datetime(date_breaks = "2 month", date_labels = "%d/%m/%Y")
+  scale_x_date(limits = as.Date(c("2024-11-01", "2025-05-31")), breaks = as.Date(c("2024-11-01", "2025-02-01", "2025-05-01")), date_labels = "%b %y")
 
+plot <- plot_grid(mass, length, 
+          labels = c("A", "B"),
+          label_size = 28,
+          nrow = 2,
+          align = "hv")
 
+legend <- get_legend(length+theme(legend.position = "right"))
 
-
+plot_grid(plot, legend,
+                     ncol = 2,
+                     rel_widths = c(1, 0.15))
 ## Note: greb1l:food, p = 0.232 and 0.0744 for weight and length, respectively
 
 
@@ -318,7 +330,9 @@ Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
     Month = as.factor(Month)
   )
 
-ggplot(
+par(mfrow = c(2, 1) ) 
+
+p1 <- ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Weight, fill=greb1l),
 ) +
@@ -339,7 +353,7 @@ ggplot(
 
 
 
-ggplot(
+p2 <- ggplot(
   data = Full_Meas_Data_Clean, 
   mapping = aes(x = Month, y = Length/10, fill=greb1l),
 ) +
@@ -359,6 +373,7 @@ ggplot(
   labs(y="Length (cm)")
 
 
+grid.arrange(p1, p2, ncol = 1)
 
 Gen_Meas_Data <- Full_Meas_Data_Clean%>%
   group_by(greb1l, food, Month)%>%

@@ -133,8 +133,8 @@ Full_Temp <- Temp_Tank22 %>%
   bind_rows(Temp_Tank24) %>%
   bind_rows(Temp_Tank25) %>%
   bind_rows(Temp_Tank26) %>%
-  bind_rows(Temp_Tank31) %>%
-  bind_rows(Temp_Tank32) %>%
+  #bind_rows(Temp_Tank31) %>%
+  #bind_rows(Temp_Tank32) %>%
   mutate(
     Date = format(Date_Time,"%Y-%m-%d"),
     Time = format(Date_Time, "%H:%M:%S"),
@@ -148,9 +148,13 @@ Full_Temp <- Temp_Tank22 %>%
   relocate(Tank)%>%
   relocate(Date_Time, .after = last_col())
 
-Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6",  "31" = "R1",  "32" = "R2")
+Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6",  
+                                #"31" = "R1",  "32" = "R2"
+                                )
 
-Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("R1", "R2", "2", "3", "4", "5","6"))
+Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c(
+  #"R1", "R2", 
+  "2", "3", "4", "5","6"))
   
 ggplot(
   data = Full_Temp, 
@@ -170,14 +174,16 @@ ggplot(
         legend.title = element_text(size = 20, face = "bold"),
         legend.text  = element_text(size = 18)
   )+
-  scale_color_colorblind(breaks=c("R1", "R2", 2, 3, 4, 5, 6))+
+  scale_color_colorblind(breaks=c(
+    #"R1", "R2", 
+    2, 3, 4, 5, 6))+
   labs(x="Date & Time", y="Water temperature (°C)")
 
 
 
 
 ### Import suntable obtained from NOAA solar calculator (and formated in excel)
-sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/NOAA_SunTimes.xlsx")
+sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/Manuscript/NOAA_SunTimes.xlsx")
 sun_table <- sun_table %>%
   select(Date, Sunrise, Sunset)%>%
   mutate(Date=as.Date(Date))
@@ -264,16 +270,15 @@ ggplot(DayLengthPlot, aes(x = Date)) +
     )+
   theme_bw()+
   scale_x_datetime(date_breaks = "3 weeks", date_labels = "%d/%m/%Y", expand = c(0,0))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
+  theme(axis.title.x = element_text(size=18, face = "bold", margin = margin(t=15)),
+        axis.title.y = element_text(size=18, face = "bold", margin = margin(r=15)),
+        axis.title.y.right = element_text(size=18, face = "bold", margin = margin(l=15)),
         axis.text.x = element_text(size=15),
-        axis.text.y = element_text(size=18),
-        strip.text   = element_text(size = 20, face = "bold"),
+        axis.text.y = element_text(size=16),
         legend.position = "bottom",
-        legend.title = element_text(size = 16, face = "bold"),
-        legend.text  = element_text(size = 14),
-        panel.margin = unit(-0.8, "lines")
+        legend.title = element_text(size = 18, face = "bold"),
+        legend.text  = element_text(size = 16)
   )+
   labs(x="Date")+
-  geom_vline(xintercept = c(as.POSIXct("2024-12-09"),as.POSIXct("2024-12-12"), as.POSIXct("2025-01-06"), as.POSIXct("2025-01-14")), color=c("red", "red","grey", "green"))
+  geom_vline(xintercept = c(as.POSIXct("2024-12-09"),as.POSIXct("2024-12-12"), as.POSIXct("2025-01-14")), color=c("red", "red", "green"))
 

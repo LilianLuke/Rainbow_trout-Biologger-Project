@@ -150,9 +150,10 @@ str(Data)
 Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
+
 PhysioActData <- Data%>%  
   group_by(#MeasNB,
-    #Swimstyle,
+    Swimstyle,
     Biologger) %>%
   summarise(
     mean_AvgEA = mean(AvgEA, na.rm = TRUE),
@@ -192,10 +193,21 @@ PhysioActData <- Data%>%
     fam = as.factor(fam),
     tank = as.factor(tank),
     Biologger = as.factor(Biologger),
+    Swimstyle = as.factor(Swimstyle),
+    
+  )
+
+ActSGRData <- PhysioActData %>%
+  pivot_wider(
+    id_cols = c(Biologger, SGRMass, fam, greb1l, tank, food, fatpercent, leanmass),
+    names_from = Swimstyle,
+    values_from = mean_AvgEA,
+    names_prefix = "activity_"
   )
 
 
 PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
+ActSGRData$food <- dplyr::recode(ActSGRData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 
 
 
@@ -213,33 +225,37 @@ ggplot(data=PhysioActDataSwim, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
 
 
 
-StdPhysioActData <- PhysioActDataSwim%>%
-  filter(
-    Swimstyle == "Steady"
-  )
-
-StdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA*greb1l*food + (1 | tank) + (1| fam) , #<= BEST MODEL
-                      family= gaussian(),
-                      data = StdPhysioActData)
-
-
-drop1(StdActSGRCorr)
-step(StdActSGRCorr)
-
-BestStdActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA + food + (1| tank) + (1| fam) , #<= BEST MODEL
+Burstprop <- glmmTMB(BurstProp ~ greb1l*food + (1 | tank) + (1| fam) , #<= BEST MODEL
                          family= gaussian(),
-                         data = StdPhysioActData)
+                         data = PhysioActData)
 
-StdPhysioActData <- StdPhysioActData%>%
-  filter(
-    SGRMass != "NA"
-  )
+summary(Burstprop)
+ggplot(data=PhysioActData, aes(y=BurstProp, x=greb1l, fill= greb1l))+
+  facet_wrap(~food)+
+  geom_boxplot()+
+  scale_fill_manual(values = c("gold2", "royalblue"))
+
+pairs(emmeans(Burstprop, ~ greb1l | food, type = "response"), adjust="sidak")
 
 
-E1 <- resid(BestStdActSGRCorr)
-StdPhysioActData$E1 <- E1
+ActSGRCorr <- glmmTMB(fatpercent ~ (activity_Steady+activity_Dynamic)*greb1l+food + (1 | tank) + (1| fam) , #<= BEST MODEL
+                         family= gaussian(),
+                         data = ActSGRData)
 
-ggplot(data=StdPhysioActData, aes(y=E1, x=mean_AvgEA, group = tank, col= tank))+
+performance(ActSGRCorr)
+summary(ActSGRCorr)
+drop1(ActSGRCorr)
+step(ActSGRCorr)
+
+BestActSGRCorr <- glmmTMB(SGRMass ~ activity_Steady + food + (1| tank) + (1| fam), #<= BEST MODEL
+                         family= gaussian(),
+                         data = ActSGRData)
+
+
+E1 <- resid(BestActSGRCorr)
+PhysioActData$E1 <- E1
+
+ggplot(data=PhysioActData, aes(y=E1, x=mean_AvgEA, group = tank, col= tank))+
   geom_point()+
   xlab("AvgEA (mg)") + 
   ylab("Residuals")+ 
@@ -248,8 +264,8 @@ ggplot(data=StdPhysioActData, aes(y=E1, x=mean_AvgEA, group = tank, col= tank))+
 
 
 
-summary(BestStdActSGRCorr)
-performance(BestStdActSGRCorr)
+summary(BestActSGRCorr)
+performance(BestActSGRCorr)
 
 SGRqr <- simulateResiduals(fittedModel = BestStdActSGRCorr, plot = FALSE)
 SGRqr$scaledResiduals
@@ -261,29 +277,10 @@ plotQQunif(SGRqr,
 
 
 
-ggplot(data=PhysioActData, aes(y=SGRMass, x=count_BurstScore, col=greb1l))+
+ggplot(data=ActSGRData, aes(y=SGRMass, x=activity_Steady))+
   facet_wrap(~food)+
   geom_point()+
-  geom_smooth(method=lm)+
-  scale_color_manual(values = c("gold2", "royalblue"))+
-  theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")
-
-str(PhysioActData$count_BurstScore)
-
-
-ggplot(data=StdPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
-  facet_wrap(~food)+
-  geom_point(aes(col=greb1l))+
-  geom_smooth(method=lm, col="black")+
-  scale_color_manual(values = c("gold2", "royalblue"))+
+  geom_smooth(method="lm")+
   theme_bw(base_size = 16)+
   theme(axis.title.x = element_text(size=18, face = "bold"),
         axis.title.y = element_text(size=18, face = "bold"),
@@ -482,7 +479,7 @@ ggplot(
 predict.ModelFat <- ggpredict(ModelFat, terms = c("food", "greb1l"), ci.lvl = 0.95)
 plot(predict.ModelFat, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
 
-ggplot(
+fat <- ggplot(
   data = predict.ModelFat, 
   mapping = aes(x = x, y = predicted, col=group)) +
   geom_point(size=6, 
@@ -492,58 +489,58 @@ ggplot(
     position = position_dodge(width = 0.8)) +
   theme_bw(base_size = 16)+
   scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic")
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size=20, face = "bold", margin = margin(r=15, l=15)),
+        axis.text.x = element_text(size=18, margin = margin(b=50)),
+        axis.text.y = element_text(size=18),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
+        legend.position = "none"
         
   )+
-  labs(x="Food treatment", y="Predicted Fat mass (g)")+
+  labs(x="Food treatment", y="Relative Fat mass (g)")+
   ylim(0,50)
 
-
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = food, y = fatmass , fill=greb1l)
-) +
-  geom_boxplot()+
-  theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic")
-        
-  )+
-  labs(x="Food treatment", y="Fat content in May (%)")
-
-
-ggplot(
+lean <- ggplot(
   data = PhysioActData, 
   mapping = aes(x = food, y = leanmass , fill=greb1l)
 ) +
   geom_boxplot()+
   theme_bw(base_size = 16)+
   scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic")
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size=20, face = "bold", margin = margin(r=15, l=15)),
+        axis.text.x = element_text(size=18, margin = margin(b=50)),
+        axis.text.y = element_text(size=18),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic"),
+        legend.position = "none",
         
   )+
   labs(x="Food treatment", y="Lean mass in May (g)")+
   ylim(0, 600)
+
+plot <- plot_grid(fat, lean, 
+          labels = c("A", "B"),
+          label_size = 28,
+          ncol = 2,
+          align = "none"
+          )
+
+legend <- get_legend(fat+theme(legend.position = "right"))
+
+legplot <- plot_grid(plot, legend,
+                     ncol = 2,
+                     rel_widths = c(1, 0.15))
+
+ggdraw(legplot) +
+  draw_label(
+    "Food treatment",
+    fontface = "bold",
+    x = 0.47,
+    y = 0.06,
+    size = 20
+  )
 
 ### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group
 
