@@ -429,7 +429,7 @@ Full_Data_Out <- Full_Data_Out %>%
 ### Because not enough data in the burst data set to add Time as a covariate (some time groups are empty or 1), we will group by day/night instead
 
 ### Import suntable obtained from NOAA solar calculator (and formated in excel)
-sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/NOAA_SunTimes.xlsx")
+sun_table <- read_xlsx(paste0(path_Solar, "NOAA_SunTimes.xlsx"))
 sun_table <- sun_table %>%
   select(Date, Sunrise, Sunset)%>%
   mutate(Date=as.character(Date))

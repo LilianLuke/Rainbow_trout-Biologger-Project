@@ -1,5 +1,4 @@
-### Get temp curves from the different tanks
-
+### Get temp curves from the different tanks and plot it alongside Day Length data
 
 
 library(dplyr)
@@ -183,7 +182,7 @@ ggplot(
 
 
 ### Import suntable obtained from NOAA solar calculator (and formated in excel)
-sun_table <- read_xlsx("C:/Users/03278487/OneDrive - Luonnonvarakeskus/PhD projects/Biolgger paper/Manuscript/NOAA_SunTimes.xlsx")
+sun_table <- read_xlsx(paste0(path_Solar, "NOAA_SunTimes.xlsx"))
 sun_table <- sun_table %>%
   select(Date, Sunrise, Sunset)%>%
   mutate(Date=as.Date(Date))
