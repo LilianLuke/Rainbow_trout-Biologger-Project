@@ -31,14 +31,14 @@ library(ggeffects)
 
 source("path_file_lilian.R")
 
+## get all temperature files (one file per tank)
 Temp_Tank22 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_22.xlsx")) 
 Temp_Tank23 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_23.xlsx")) 
 Temp_Tank24 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_24.xlsx")) 
 Temp_Tank25 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_25.xlsx")) 
 Temp_Tank26 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_26.xlsx"))
-Temp_Tank31 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_31.xlsx"))
-Temp_Tank32 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_32.xlsx"))
 
+## Format each file to prepare for merging
 Temp_Tank22 <- Temp_Tank22 %>%
   mutate(
     Tank = as.factor(22),
@@ -87,53 +87,12 @@ Temp_Tank26 <- Temp_Tank26 %>%
     Date_Time = `Date Time, GMT+02:00`
   )
 
-Temp_Tank31 <- Temp_Tank31 %>%
-  mutate(
-    Tank = as.factor(31),
-  ) %>%
-  rename( 
-    Temp = `Temp, °C (LGR S/N: 20174562, SEN S/N: 20174562)`,
-    Date_Time = `Date Time, GMT+02:00`
-  )%>%
-  mutate(
-    Date = format(Date_Time,"%Y-%m-%d"),
-    Time = format(Date_Time, "%H:%M:%S"),
-    Date = as.Date(Date),
-    Date_Time = as.POSIXct(Date_Time)
-  )%>%
-  filter(
-    Date > "2024-12-12",
-    Date < "2025-01-06"
-  )
-
-Temp_Tank32 <- Temp_Tank32 %>%
-  mutate(
-    Tank = as.factor(32),
-  ) %>%
-  rename( 
-    Temp = `Temp, °C (LGR S/N: 20291672, SEN S/N: 20291672)`,
-    Date_Time = `Date Time, GMT+02:00`
-  )%>%
-  mutate(
-    Date = format(Date_Time,"%Y-%m-%d"),
-    Time = format(Date_Time, "%H:%M:%S"),
-    Date = as.Date(Date),
-    Date_Time = as.POSIXct(Date_Time)
-  )%>%
-  filter(
-    Date > "2024-12-12",
-    Date < "2025-01-06"
-  )
-
-
-
+## Merge them all in one file
 Full_Temp <- Temp_Tank22 %>%
   bind_rows(Temp_Tank23) %>%
   bind_rows(Temp_Tank24) %>%
   bind_rows(Temp_Tank25) %>%
   bind_rows(Temp_Tank26) %>%
-  #bind_rows(Temp_Tank31) %>%
-  #bind_rows(Temp_Tank32) %>%
   mutate(
     Date = format(Date_Time,"%Y-%m-%d"),
     Time = format(Date_Time, "%H:%M:%S"),
@@ -147,14 +106,11 @@ Full_Temp <- Temp_Tank22 %>%
   relocate(Tank)%>%
   relocate(Date_Time, .after = last_col())
 
-Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6",  
-                                #"31" = "R1",  "32" = "R2"
-                                )
+Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6") ## recode tank names for clarity
 
-Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c(
-  #"R1", "R2", 
-  "2", "3", "4", "5","6"))
+Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("2", "3", "4", "5", "6")) ## rearrange them in the correct order
   
+## See what it looks like
 ggplot(
   data = Full_Temp, 
   mapping = aes(x = Date_Time, y = Temp, col=Tank),
@@ -178,8 +134,7 @@ ggplot(
     2, 3, 4, 5, 6))+
   labs(x="Date & Time", y="Water temperature (°C)")
 
-
-
+### Now we want to add the day length data to it ###
 
 ### Import suntable obtained from NOAA solar calculator (and formated in excel)
 sun_table <- read_xlsx(paste0(path_Solar, "NOAA_SunTimes.xlsx"))
@@ -203,9 +158,9 @@ Full_Temp_DL <- Full_Temp_DL %>%
     NOAA_Sunset = Sunset,
   )
 
-str(Full_Temp_DL$Time)
+str(Full_Temp_DL)
 
-### Calculate Daylength
+### Calculate Daylength (and nightlength)
 Full_Temp_DL <- Full_Temp_DL %>% 
   mutate(
     NOAA_Sunrise = as.numeric(NOAA_Sunrise),
@@ -246,6 +201,8 @@ DayLengthPlot <- Full_Temp_DL%>%
     Date < "2025-05-21"
   )
 
+
+## recode some factors for plot's clarity
 DayLengthPlot$Period <- dplyr::recode(DayLengthPlot$Period, "DayLength" = "Day",  "NightLength" = "Night")
 DayLengthPlot$Period <- factor(DayLengthPlot$Period, levels = c("Night", "Day"))
 
