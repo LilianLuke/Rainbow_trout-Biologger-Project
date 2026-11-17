@@ -1,4 +1,4 @@
-### This Script is for looking at the effect of activity on physiological parameters 
+### This Script is for looking at the effect of activity on physiological parameters (SGR, lean mass and relative fat mass)
 
 library(dplyr)
 library(lubridate)
@@ -20,6 +20,7 @@ library(plotrix)
 library(carData)
 library(ggplot2)
 library(ggrepel)
+library(cowplot)
 library(MuMIn)
 library(openxlsx)
 library(lsmeans)
@@ -33,35 +34,19 @@ library(performance)
 source("path_file_lilian.R")
 
 
-Full_Data <- read_xlsx(paste0(path.data, "Biologger Final data.xlsx")) 
+Full_Data <- read_xlsx(paste0(path.data, "Biologger Final data.xlsx")) ## get accelerometery data
 
-Full_Data <- Full_Data %>%
-  select(
-    !Season
-    )%>%
-  rename(
-    Season = Tempgroup
-  )%>%
-  mutate(
-    Season=recode_factor(
-    Season, "LowTemp" = "Winter",  "HighTemp" = "Spring")
-    )
+Xray_data_clean <- read_xlsx(paste0(path.data,"Biologger Physio data.xlsx")) ## get DXA data
+
+str(Full_Data)
+str(Xray_data_clean)
 
 
-### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
-Full_Data$Season <- factor(Full_Data$Season, levels = c("Winter", "Spring"))
-
-Xray_data_clean <- read_xlsx(paste0(path.data,"Biologger Physio data.xlsx"))
-
-str(Xray_data_clean$fatpercent)
-str(Xray_data_clean$fatmass)
-
-
-Full_Data_ActnPhysio <- Full_Data %>%
+ActnPhysio <- Full_Data %>% ## merge both data sets in one
   left_join(Xray_data_clean, by = "Biologger")
 
 
-Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
+Full_ActnPhysio <- ActnPhysio %>% ## format all the variables 
   mutate(
     greb1l = as.factor(greb1l),
     omy05 = as.factor(omy05),
@@ -97,17 +82,14 @@ Full_Data_ActnPhysio <- Full_Data_ActnPhysio %>%
 
 
 ## make sure factors are read correctly
-str(Full_Data_ActnPhysio)
+str(Full_ActnPhysio)
 
 
-#write_xlsx(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.xlsx"))
-#write_csv(Full_Data_ActnPhysio, paste0(path.data, "/Biologger act&physio data.csv"))
+#write_xlsx(Full_Data_ActnPhysio, paste0(path.data, "Biologger act&physio data.xlsx"))
+#write_csv(Full_Data_ActnPhysio, paste0(path.data, "Biologger act&physio data.csv"))
+#Full_ActnPhysio <- read_xlsx(paste0(path.data, "Biologger act&physio data.xlsx"))
 
-
-
-Data <- read_xlsx(paste0(path.data, "Biologger act&physio data.xlsx"))
-
-Data <- Data %>%
+Full_ActnPhysio <- Full_ActnPhysio %>%
   mutate(
     greb1l = as.factor(greb1l),
     omy05 = as.factor(omy05),
@@ -144,14 +126,14 @@ Data <- Data %>%
 
 
 
-str(Data)
+str(Full_ActnPhysio)
 
 
-Data$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
+Full_ActnPhysio$Season <- factor(Data$Season, levels = c("Winter", "Spring"))
 
 
 
-PhysioActData <- Data%>%  
+ActnPhysio_Data <- Full_ActnPhysio%>%  ## Create a data set with 1 row for each individual, to avoid confounding individual characteristics with repeated measurements
   group_by(#MeasNB,
     Swimstyle,
     Biologger) %>%
@@ -197,86 +179,44 @@ PhysioActData <- Data%>%
     
   )
 
-ActSGRData <- PhysioActData %>%
+ActnPhysio_Data$food <- dplyr::recode(ActnPhysio_Data$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted") ## A bit fo formating for plots
+
+
+ActSGRData <- ActnPhysio_Data %>%  ## Get mmean Steady swimming activity and mean Burst Swimming activity for each individuals
   pivot_wider(
-    id_cols = c(Biologger, SGRMass, fam, greb1l, tank, food, fatpercent, leanmass),
+    id_cols = c(Biologger, SGRMass, fam, greb1l, tank, food, fatmass, leanmass),
     names_from = Swimstyle,
     values_from = mean_AvgEA,
     names_prefix = "activity_"
   )
 
+str(ActSGRData)
 
-PhysioActData$food <- dplyr::recode(PhysioActData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
-ActSGRData$food <- dplyr::recode(ActSGRData$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
-
-
-
-ggplot(data=PhysioActData, aes(y=mean_AvgEA, x=MeasNB , col=greb1l, group=Biologger))+
-  facet_wrap(~tank)+
-  geom_point()+
-  geom_path()+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
-ggplot(data=PhysioActDataSwim, aes(y=SGRMass, x=mean_AvgEA, col= greb1l))+
-  facet_wrap(~Swimstyle+food)+
-  geom_point()+
-  geom_smooth(method=lm)+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
-
-
-Burstprop <- glmmTMB(BurstProp ~ greb1l*food + (1 | tank) + (1| fam) , #<= BEST MODEL
-                         family= gaussian(),
-                         data = PhysioActData)
-
-summary(Burstprop)
-ggplot(data=PhysioActData, aes(y=BurstProp, x=greb1l, fill= greb1l))+
-  facet_wrap(~food)+
-  geom_boxplot()+
-  scale_fill_manual(values = c("gold2", "royalblue"))
-
-pairs(emmeans(Burstprop, ~ greb1l | food, type = "response"), adjust="sidak")
-
-
-ActSGRCorr <- glmmTMB(fatpercent ~ (activity_Steady+activity_Dynamic)*greb1l+food + (1 | tank) + (1| fam) , #<= BEST MODEL
-                         family= gaussian(),
-                         data = ActSGRData)
-
-performance(ActSGRCorr)
-summary(ActSGRCorr)
-drop1(ActSGRCorr)
-step(ActSGRCorr)
+## Test if steady or burst swimming activity affect body parameters
 
 BestActSGRCorr <- glmmTMB(SGRMass ~ activity_Steady + food + (1| tank) + (1| fam), #<= BEST MODEL
                          family= gaussian(),
                          data = ActSGRData)
 
+drop1(BestActSGRCorr) #need to drop tank for model selection to avoid convergence problems
 
-E1 <- resid(BestActSGRCorr)
-PhysioActData$E1 <- E1
-
-ggplot(data=PhysioActData, aes(y=E1, x=mean_AvgEA, group = tank, col= tank))+
-  geom_point()+
-  xlab("AvgEA (mg)") + 
-  ylab("Residuals")+ 
-  geom_smooth(method = "lm", 
-              se = FALSE)
-
-
-
-summary(BestActSGRCorr)
+## Model inspection
 performance(BestActSGRCorr)
+hist(resid(BestActSGRCorr))
+qqPlot(resid(BestActSGRCorr))
 
-SGRqr <- simulateResiduals(fittedModel = BestStdActSGRCorr, plot = FALSE)
+SGRqr <- simulateResiduals(fittedModel = BestActSGRCorr, plot = FALSE)
 SGRqr$scaledResiduals
 plotQQunif(SGRqr, 
            testUniformity = TRUE, 
            testOutliers = TRUE, 
            testDispersion = TRUE)
 
+## Results
+summary(BestActSGRCorr)
 
 
-
+## Plot result
 ggplot(data=ActSGRData, aes(y=SGRMass, x=activity_Steady))+
   facet_wrap(~food)+
   geom_point()+
@@ -289,196 +229,55 @@ ggplot(data=ActSGRData, aes(y=SGRMass, x=activity_Steady))+
         strip.text   = element_text(size = 20, face = "bold"),
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x="Individual average steady swimming AvgEA", y="Specific growth rate (%/day)")+
+  labs(x="Individual average steady swimming AvgEA (mg)", y="Specific growth rate (%/day)")+
   xlim(0,8)
         
 
-ggplot(data=PhysioActData, aes(y=WeightFeb, x=SGRMass, col=greb1l))+
-  facet_wrap(~food)+
-  geom_point()
-  geom_smooth(method = lm)
-  
-  
-  
-BrstPhysioActData <- PhysioActDataSwim%>%
-  filter(
-    Swimstyle == "Dynamic"
-  )
-
-BrstActSGRCorr <- glmmTMB(SGRMass ~ mean_AvgEA+food+ (1 | tank) + (1| fam) , #<= BEST MODEL
-                         family= gaussian(),
-                         data = BrstPhysioActData)
-
-summary(BrstActSGRCorr)
-performance(BrstActSGRCorr)
-SGRqr <- simulateResiduals(fittedModel = BrstActSGRCorr, plot = FALSE)
-SGRqr$scaledResiduals
-plotQQunif(SGRqr, 
-           testUniformity = TRUE, 
-           testOutliers = TRUE, 
-           testDispersion = TRUE)
-
-ggplot(data=BrstPhysioActData, aes(y=SGRMass, x=mean_AvgEA))+
-  facet_wrap(~food)+
-  geom_point(aes(col=greb1l))+
-  geom_smooth(method=lm, col="black")+
-  scale_color_manual(values = c("gold2", "royalblue"))+
-  theme_bw(base_size = 16)+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x = "Individual average burst swimming AvgEA", y="Specific growth rate (%/day)")
-
-
-SteadyActLF <- SteadyActData %>%
-  filter(
-    food == "low-food"
-  )
-
-PhysioActNight <- PhysioActData %>%
-  filter(
-    Light == "Night"
-  )
-
-
-ggplot(
-  data = SteadyActLF, 
-  mapping = aes(x = WeightFeb , y = mean_AvgEA)
-) +
-  facet_wrap(~food)+
-  geom_point(aes(col=greb1l))+
-  geom_smooth(method="lm")
-
-
-  
-  
-ActBodyCorr <- glmmTMB(mean_AvgEA ~ WeightFeb+food*greb1l, #<= BEST MODEL
+### Quickly check that there is no effect of initial fish size on individual mean AvgEA values 
+Weightcheck <- glmmTMB(mean_AvgEA ~ WeightFeb,
                      family= gaussian(),
                      data = PhysioActData)
+summary(Weightcheck)
+performance(Weightcheck)
 
-summary(ActBodyCorr)
-performance(ActBodyCorr)
+Lengthcheck <- glmmTMB(mean_AvgEA ~ LengthFeb,
+                       family= gaussian(),
+                       data = PhysioActData)
 
-predict.ActBodyCorr <- ggpredict(ActBodyCorr, terms = c("WeightFeb"))
+summary(Lengthcheck)
+performance(Lengthcheck)
 
-ggplot(predict.ActBodyCorr, aes(y= predicted, x=x))+
-  geom_point()+
-  geom_errorbar(aes(ymin=conf.low, ymax=conf.high))
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = MeasNB , y = log(mean_AvgEA), col=greb1l, group=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  #geom_path(aes(group=Biologger))+
-  geom_smooth()+
-  scale_fill_manual(values = c("gold2", "royalblue"))+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
- ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_boxplot()+
-  scale_fill_manual(values = c("gold2", "royalblue"))+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
-
-ggplot(
-  data = PhysioActDayta, 
-  mapping = aes(x = greb1l , y = mean_VAR, fill=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_boxplot()+
-  scale_fill_manual(values = c("gold2", "royalblue"))+
-  scale_color_manual(values = c("gold2", "royalblue"))
-
-
-
-
-str(PhysioActData$Biologger)
-str(PhysioActData$fam)
-str(PhysioActData$greb1l)
-str(PhysioActData$tank)
-str(PhysioActData$food)
-str(PhysioActData$Date)
-str(PhysioActData$Time)
-str(PhysioActData$DateTime)
-str(PhysioActData$BurstScore)
-str(PhysioActData$Swimstyle)
-str(PhysioActData$Season)
-str(PhysioActData)
-n_distinct(PhysioActData$Biologger)
 
 ## test if greb, food or activity affects lean mass
+Modellean <- glmmTMB(leanmass ~ activity_Steady*greb1l+food + (1| tank) + (1| fam), #<= BEST MODEL
+                          family= gaussian(),
+                          data = ActSGRData)
 
-Modellean <- lme(leanmass ~ mean_AvgEA+greb1l*food,#<= BEST MODEL
-                method = "REML",
-                random = list(tank=~1, fam=~1),
-                data = PhysioActData,
-                na.action = na.omit)
+drop1(Modellean) #need to drop tank for model selection to avoid convergence problems
 
 performance(Modellean)
 hist(resid(Modellean))
 qqPlot(resid(Modellean))
 summary(Modellean)
 
-step(Modellean)
 
-ggplot(BrstPhysioActData, aes(y= fatpercent, x=count_BurstScore, col=greb1l))+
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method="lm")
+## fat mass correlates with body size (lean mass) in a log/log relationship.
+ModelFat <- glmmTMB(log(fatmass)  ~  log(leanmass) + greb1l + food + (1| tank) + (1| fam), #<= BEST MODEL (greb1l was included in the model to show on plots, but was not retained in the best model)
+                          family= gaussian(),
+                          data = ActSGRData)
 
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = mean_AvgEA, y = leanmass, col=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method = "lm")
-
-
-## fat mass correlates with body size (lean mass)
-
-ModelFat <- lme(log(fatmass) ~ log(leanmass)+food+greb1l,
-                method = "REML",
-                random = list(tank=~1, fam=~1),
-                data = PhysioActData,
-                na.action = na.omit)
+drop1(ModelFat) #need to drop tank for model selection to avoid convergence problems
 
 hist(resid(ModelFat))
 qqPlot(resid(ModelFat))
+performance(ModelFat)
 summary(ModelFat)
-anova(ModelFat)
 
+### The residuals of the log(fat mass)-log(lean mass) relationship should then be relative fat mass, which is what we want to show
 
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = log(leanmass), y = log(fatmass), col=food)
-) +
-  geom_point()+
-  geom_smooth(method=lm)
+predict.ModelFat <- ggpredict(ModelFat, terms = c("food", "greb1l"), ci.lvl = 0.95) ## extract relative fat mass from the model
 
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = log(leanmass), y = log(fatmass), col=greb1l)
-) +
-  facet_wrap(~food)+
-  geom_point()+
-  geom_smooth(method=lm)
-
-predict.ModelFat <- ggpredict(ModelFat, terms = c("food", "greb1l"), ci.lvl = 0.95)
-plot(predict.ModelFat, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
-
+## Plot relative fat mass
 fat <- ggplot(
   data = predict.ModelFat, 
   mapping = aes(x = x, y = predicted, col=group)) +
@@ -501,6 +300,7 @@ fat <- ggplot(
   labs(x="Food treatment", y="Relative Fat mass (g)")+
   ylim(0,50)
 
+## Plot lean mass
 lean <- ggplot(
   data = PhysioActData, 
   mapping = aes(x = food, y = leanmass , fill=greb1l)
@@ -520,6 +320,7 @@ lean <- ggplot(
   labs(x="Food treatment", y="Lean mass in May (g)")+
   ylim(0, 600)
 
+## Show both plots on the same board
 plot <- plot_grid(fat, lean, 
           labels = c("A", "B"),
           label_size = 28,
@@ -542,124 +343,7 @@ ggdraw(legplot) +
     size = 20
   )
 
-### <= greb1l effect not significant in the GLMM, but looks like something is going on in the low food group
-
-ModelMassAct <- glmmTMB(leanmass ~(mean_AvgEA+food) * greb1l + (1|tank) + (1|fam) , # <= Best Model 
-                       family = gaussian(),
-                       data = PhysioActData)
-
-summary(ModelMassAct)
 
 
-Fultonm_burst  <- lme(PercentDeltaFulton ~ log(BurstProp),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_var    <- lme(PercentDeltaFulton ~ log(mean_VAR),    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_avgEA  <- lme(PercentDeltaFulton ~ mean_AvgEA,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_maxEA  <- lme(PercentDeltaFulton ~ log(mean_MaxEA),  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-
-AIC(Fultonm_burst, Fultonm_var, Fultonm_avgEA, Fultonm_maxEA)
-
-Fultonm_lean  <- lme(PercentDeltaFulton ~ leanmass,  random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_fat    <- lme(PercentDeltaFulton ~ fatmass,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-Fultonm_fatPer    <- lme(PercentDeltaFulton ~ fatpercent,    random = list(fam = ~1, tank = ~1), data = PhysioActData)
-
-AIC(Fultonm_lean, Fultonm_fat,Fultonm_fatPer)
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = leanmass, y = resid_fat, col=food)
-) +
-  geom_point()+
-  geom_smooth(method=lm)
-
-
-
-
-TestFulton <- lme(resid_fat ~ leanmass,
-                   method="ML",
-                   random=list(fam=~1, tank=~1),
-                   data = PhysioActData)
-r2 <- r.squaredGLMM(TestFulton)
-r2c <- r2[1, "R2c"]
-
-
-
-BestModelFulton <- glmmTMB(log(LengthMay) ~ log(meanAvgEA)+greb1l + (1|fam) + (1| tank), #best model ?
-                       family = gaussian(),
-                       data = PhysioActData)
-
-hist(resid(BestModelFulton))
-qqPlot(resid(BestModelFulton))
-summary(BestModelFulton)
-
-r2 <- r.squaredGLMM(BestModelFulton)
-r2c <- r2[1, "R2c"]
-
-
-predict.ModelFulton <- ggpredict(BestModelFulton, terms = c("BurstProp"), ci.lvl = 0.95)
-plot(predict.ModelFulton, colors = c("darkgreen",  "palegreen2"), line_size = 1.5)
-
-ggplot(PhysioActData, 
-       aes(x=log(BurstProp), y = PercentDeltaFulton))+
-  geom_point(size=3, aes(col=food))+
-  geom_smooth(method=lm, col="black")+
-  ylim(100, 175)+
-  labs(x = "log(Proportion of time bursting)", y="Change in initial body condition (%)")+
-  theme_bw()+
-  scale_fill_manual(values = c("darkgreen", "palegreen2")) +
-  scale_colour_manual(values = c("darkgreen", "palegreen2"),
-                      labels = c("High food", "Low food"))+
-  theme(axis.text.x = element_text(size = 14),  
-        axis.text.y = element_text(size = 14),
-        axis.title = element_text(size = 17, face = "plain"),                        
-        panel.grid = element_blank(),
-        plot.margin = unit(c(1,1,1,1), units = , "cm"),
-        legend.text = element_text(size = 14, face = "italic"),
-        legend.title = element_blank(),
-        legend.position = c(0.88, 0.9),
-        )+
-  annotate("text",
-           x= Inf, y= Inf,
-           label = paste0("R²=", round(r2c,2)),
-           hjust = 9, vjust=11,
-           size=5)
-  
-       
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = logBurstScore, y = PercentDeltaFulton)
-) +
-  geom_point()+
-  geom_smooth(method=lm)
-
-
-
-
-
-
-ModelHeart <- lme(Heartmass ~ log(WeightMay):food,
-                       method="ML",
-                       random=list(fam=~1, tank=~1),
-                       data = PhysioActData)
-
-
-
-hist(resid(ModelHeart))
-qqPlot(resid(ModelHeart))
-summary(ModelHeart)
-dd<- dredge(ModelHeart)
-anova(ModelHeart)
-
-predict.ModelHeart <- ggpredict(ModelHeart, terms = c("fatmass", "food", "greb1l"), ci.lvl = 0.95)
-plot(predict.ModelHeart, colors = c("#E96C0CFF",  "#420A68FF"), line_size = 1.5)
-
-
-ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = WeightMay, y = Heartmass, col=food)
-) +
-  geom_point()+
-  geom_smooth(method=lm)
 
 
