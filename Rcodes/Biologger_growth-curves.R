@@ -1,4 +1,4 @@
-### This script is to tidy body measurement data and plot growth curves ###
+### This script is to tidy and analyse body measurement data  ###
 
 
 library(dplyr)
@@ -161,7 +161,7 @@ n_distinct(Full_Meas_Data_Clean$Biologger)
 
 ggplot(
   data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Length, col=greb1l, group = Biologger),
+  mapping = aes(x = Month, y = log(Length), col=greb1l, group = Biologger),
 ) +
   facet_wrap(~food)+
   geom_point(alpha=.5)+
@@ -171,14 +171,14 @@ ggplot(
 
 ggplot(
   data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Weight, col=greb1l, group = Biologger),
+  mapping = aes(x = Month, y = log(Weight), col=greb1l, group = Biologger),
 ) +
   facet_wrap(~food)+
   geom_point(alpha=.5)+
   geom_path()+
   theme(legend.position = "none")
 
-## Looks like there is a greb effect in food-restricted ;/ 
+## Looks like there is a greb1l effect in food-restricted ;/ 
 
 Full_Meas_Data_Clean$greb1l <- dplyr::recode(Full_Meas_Data_Clean$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
 Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
@@ -186,18 +186,19 @@ Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "high-food
 
 
 
-##There is a trend, see what the GLMM says with month+greb1l*food
+##There is a trend, see what the GLMM says
 
 
-Weight <- glmmTMB(log(Weight) ~ Month*greb1l*food,
+Weight <- glmmTMB(log(Weight) ~ Month*greb1l*food + (1| tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(),
                   data = Full_Meas_Data_Clean)
 
-step(Weight)
+drop1(Weight)
 
-Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
+Weight <- glmmTMB(log(Weight) ~ (Month+greb1l)*food + (1| tank) + (1 | fam) + (1| Biologger), ## <= BEST MODEL
                       family = gaussian(),
                       data = Full_Meas_Data_Clean)
+
 performance(Weight)
 Weightqr <- simulateResiduals(fittedModel = Weight, plot = FALSE)
 Weightqr$scaledResiduals
@@ -207,28 +208,22 @@ plotQQunif(Weightqr,
            testDispersion = TRUE)
 
 summary(Weight)
+
+## The food*greb1l interaction is not significant, but removing it increases AIC, let's check what's happening here
+
 pairs(regrid(emmeans(Weight, ~ greb1l | food, type = "response")), ajust="Tukey")
 
+## Looks like there is quite a difference in the food-restricted group
 
+## Same analysis with Length in cm
 
-ggplot(data=Full_Meas_Data_Clean, aes(y=Weight, x=Month, group = tank, col= tank))+ 
-  facet_wrap(~food)+
-  geom_point()+
-  xlab("AvgEA (mg)") + 
-  ylab("Residuals")+ 
-  geom_smooth(method = "lm", 
-              se = FALSE)
-
-
-
-Length <- glmmTMB(log(Length/10) ~ Month*greb1l*food,
+Length <- glmmTMB(log(Length/10) ~ Month*greb1l*food + (1| tank) + (1 | fam) + (1| Biologger),
                   family = gaussian(),
                   data = Full_Meas_Data_Clean)
 
-step(Length)
-# Step() does not work if I add random factors, so I do it without first and it usually works
-# In this case, I find that when including random factors, it is better to keep Month:Food, even though the Step() says it should be dropped
-Length <- glmmTMB(log(Length/10) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger),
+drop1(Length) ## stepwise model selection based on AIC, rerun after droping each term
+
+Length <- glmmTMB(log(Length/10) ~ (Month+greb1l)*food + (1 | tank) + (1 | fam) + (1| Biologger), ## <= BEST MODEL
                   family = gaussian(), 
                   data = Full_Meas_Data_Clean)
 
@@ -236,14 +231,15 @@ performance(Length)
 Lengthqr <- simulateResiduals(fittedModel = Length, plot = FALSE)
 Lengthqr$scaledResiduals
 plotQQunif(Lengthqr, 
-           testUniformity = TRUE, 
+           testUniformity = TRUE,   ## Uniformity test significant, not good but not much we can do about that
            testOutliers = TRUE, 
            testDispersion = TRUE)
 
 summary(Length)
-pairs(emmeans(Length, ~ greb1l | food, type = "response"),ajust="Tukey")
+## food*greb1l same as with weight, ns but meaningful
+pairs(emmeans(Length, ~ greb1l | food, type = "response"), ajust="Sidak")
 
-par(mfrow = c(2, 1)) 
+## plot data
 
 length <- ggplot(
   data = Full_Meas_Data_Clean, 
@@ -300,96 +296,4 @@ legend <- get_legend(length+theme(legend.position = "right"))
 plot_grid(plot, legend,
                      ncol = 2,
                      rel_widths = c(1, 0.15))
-## Note: greb1l:food, p = 0.232 and 0.0744 for weight and length, respectively
-
-
-Full_Meas_Data_LF <- Full_Meas_Data_Clean %>%
-  filter(
-    food == "Low Food"
-  )
-
-
-Weight <- glmmTMB(log(Weight) ~ Month+greb1l + (1 | tank) + (1 | fam) + (1| Biologger),
-                  family = gaussian(),
-                  data = Full_Meas_Data_LF)
-
-summary(Weight)
-
-Length <- glmmTMB(log(Length) ~ Month+greb1l + (1 | tank) + (1 | fam) + (1| Biologger),
-                  family = gaussian(), 
-                  data = Full_Meas_Data_LF)
-
-summary(Length)
-
-
-Full_Meas_Data_Clean$food <- dplyr::recode(Full_Meas_Data_Clean$food, "High Food" = "Ad Libitum",  "Low Food" = "Food Restricted")
-
-
-Full_Meas_Data_Clean <- Full_Meas_Data_Clean %>%
-  mutate(
-    Month = as.factor(Month)
-  )
-
-par(mfrow = c(2, 1) ) 
-
-p1 <- ggplot(
-  data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Weight, fill=greb1l),
-) +
-  facet_wrap(~food)+
-  geom_boxplot()+
-  theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
-  scale_x_discrete(name = "Month", labels = c("Nov 2024", "Feb 2025", "May 2025"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=14),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"),
-  )+
-  labs(y="Weight (g)")
-
-
-
-p2 <- ggplot(
-  data = Full_Meas_Data_Clean, 
-  mapping = aes(x = Month, y = Length/10, fill=greb1l),
-) +
-  facet_wrap(~food)+
-  geom_boxplot()+
-  theme_bw(base_size = 16)+
-  scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1l", labels = c("Summer", "Winter"))+
-  scale_x_discrete(name = "Month", labels = c("Nov 2024", "Feb 2025", "May 2025"))+
-  theme(axis.title.x = element_text(size=18, face = "bold"),
-        axis.title.y = element_text(size=18, face = "bold"),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=14),
-        strip.text   = element_text(size = 20, face = "bold"),
-        legend.title = element_text(size = 16, face = "italic"),
-        legend.text  = element_text(size = 14,face = "italic"),
-  )+
-  labs(y="Length (cm)")
-
-
-grid.arrange(p1, p2, ncol = 1)
-
-Gen_Meas_Data <- Full_Meas_Data_Clean%>%
-  group_by(greb1l, food, Month)%>%
-  summarise(
-    Length = mean(Length),
-    Weight = mean(Weight),
-  )
-
-
-ggplot(
-  data = Gen_Meas_Data, 
-  mapping = aes(x = Month, y = Length, col=greb1l, group = greb1l),
-) +
-  facet_wrap(~food)+
-  geom_point(alpha=.5)+
-  geom_path()+
-  theme(legend.position = "none")+
-  scale_color_manual(values = c("gold2", "royalblue"))
 
