@@ -152,6 +152,7 @@ Full_Data <- Full_Data %>%
          Date, 
          Time, 
          DateTime,
+         Light
          )%>%
   rename(
     BodyTemp=Temp,
@@ -175,43 +176,59 @@ ggplot(data=Full_Data_Temp, aes(y= BodyTemp, x=WaterTemp))+
 
 
 ggplot(Full_Data_Temp, aes(x = DateTime)) +
-  facet_wrap(~Date)+
   geom_line(aes(y = WaterTemp))+
-  geom_point(alpha=.1, aes(y = BodyTemp, col=greb1l))+
-  geom_smooth(method ="gam", aes(y = BodyTemp, col=greb1l))+
-  geom_line(aes(y = BodyTemp, col=greb1l, group = Biologger))+
+  geom_point(alpha=.1, aes(y = BodyTemp))+
+  geom_smooth(method ="gam", aes(y = BodyTemp), formula = y ~ s(x, k = 20))+
   scale_y_continuous(
     name = "Water Temperature (°C)",
     sec.axis=sec_axis(transform= ~.*1, name = "Body Temperature (°C)")
   )+
-  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme_bw()
 
 
 
 
 
+Temp1 <- glmmTMB(BodyTemp ~ WaterTemp,
+                family = gaussian(),
+                data = Full_Data_Temp)
 
-Temp <- glmmTMB(BodyTemp ~ WaterTemp*greb1l*food + (1 | tank) + (1 | fam) + (1| Biologger),
+Full_Data_Temp$corr_BodyTemp <- resid(Temp1)
+
+
+Temp2 <- glmmTMB(corr_BodyTemp ~ Light+greb1l*food + (1| tank) + (1| fam) + (1| Biologger),
                   family = gaussian(),
                   data = Full_Data_Temp)
-summary(Temp)
-Tempqr <- simulateResiduals(fittedModel = Temp, plot = FALSE)
+
+performance(Temp2)
+
+Tempqr <- simulateResiduals(fittedModel = Temp2, plot = FALSE)
 Tempqr$scaledResiduals
 plotQQunif(Tempqr, 
            testUniformity = TRUE, 
            testOutliers = TRUE, 
            testDispersion = TRUE)
 
-
 hist(resid(Temp), breaks = 500)
 
-Full_Data_Temp$corr_BodyTemp <- resid(Temp)
-  
+summary(Temp2) # <= Is that a ciracadian endogenous thermogenesis patter that I see here?
 
-ggplot(data=Full_Data_Temp, aes(y= BodyTemp-WaterTemp, x=WaterTemp, col=greb1l))+
-  facet_wrap(~food)+
-  geom_point(alpha=.01)+
-  geom_smooth(method="lm")+
-  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))
-  
+Full_Data_Temp$food <- dplyr::recode(Full_Data_Temp$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
+Full_Data_Temp$greb1l <- dplyr::recode(Full_Data_Temp$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
+
+
+ggplot(data=Full_Data_Temp, aes(y= corr_BodyTemp, x=DateTime, col=Light))+ # <= If yes, very tiny difference
+  geom_point(alpha=.1)+
+  geom_smooth(method="lm")
+
+
+ggplot(data=Full_Data_Temp, aes(y= corr_BodyTemp, x=Light, fill=Light))+ # <= Day vs Night not very consistent accross dates
+  facet_wrap(~Date)+
+  geom_boxplot()
+
+## Most likely explanation: at night, fish may be closer to the bottom of the tank, where water could be slightly colder
+## Indeed, the thermometers in the tanks take water temp at only one location in the tank, 
+## so some variation between biologger temperature reading and tank thermometer could be explained by variation in the fish-thermometer distance
+## Looks like we might be on something here, but further test should be performed
+## One possibility would be to test dead vs alive fish and see if the same differences are observed
+## For now, there is no reason to think that body temp was influenced by anything else than water temp

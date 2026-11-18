@@ -71,15 +71,6 @@ str(Full_Data_Out$DateTime)
 
 
 
-### Create a log column for each ACT parameter to be able to run GAMMS on it
-Full_Data_Out <- Full_Data_Out %>%
-  group_by(Biologger) %>%
-  mutate(
-    LogAvgEA = as.numeric(log10(`AvgEA`+0.001)),
-    LogMaxEA = as.numeric(log10(`MaxEA`+0.001)),
-    LogVAR = as.numeric(log10(VAR+0.76)),
-  )
-
 ### Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
@@ -100,98 +91,47 @@ Full_Data_Out <- Full_Data_Out %>%
       "LowTemp",
       "HighTemp"
     )),
-    corr.AvgEA = as.numeric(AvgEA-MaxEA/60),
-    corr.VAR = as.numeric(VAR-(MaxEA-(MaxEA/60))^2/60),
-    th.VAR = as.numeric(((MaxEA-(10))^2+59*(0-(10))^2)/60),
   ) %>%
   filter(
     Biologger != "UXL0471DAT",
   )
 
-str(Full_Data_Out$BurstScore)
-str(Full_Data_Out$Swimstyle)
-str(Full_Data_Out$Tempgroup)
-
-### Force the plots to show winter or low-temp on the left and spring or high-temp on the right
-Full_Data_Out$Season <- factor(Full_Data_Out$Season, levels = c("Winter", "Spring"))
-Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp", "HighTemp"))
+str(Full_Data_Out)
 
 
-
+### Visual inspection of accelerometery data: What does it tell us?
 
 ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA)) +
   geom_point(alpha=0.5) +
   labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
   #geom_line(aes(x= MaxEA, y= MaxEA/60, col="red"), linewidth=1)+
-  geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 10, slope =  0, color="blue")
+  geom_abline(intercept = 0, slope = 1/60, color="red")+ ## Theoretical values if EA is mostly ~0 and one is MaxEA (AvgEA = MaxEA/60)
+  geom_abline(intercept = 0, slope = 1, color="red") ## Theoretical values if EA is constant MaxEA (AvgEA = MaxEA)
 
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA-MaxEA/60)) +
+ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA-(MaxEA/60))) + ## try to get a better idea of AvgEA without the effect of MaxEA
   geom_point(alpha=0.1) +
   labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration") +
-  geom_abline(intercept = 0, slope = 0, color="red")+
-  geom_abline(intercept = 10, slope = 0, color="blue")
-
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = VAR, col=Swimstyle)) +
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Corrected Average Acceleration")+
-  geom_line(aes(x= MaxEA, y= th.VAR), color="red", linewidth=1)
-
-
-
-
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=Swimstyle)) +
-  #facet_wrap(~Biologger)+
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
-  geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 0, slope = 1, color="red")+
-  #geom_abline(intercept = 10, slope = 0, color="blue")+
-  xlim(0,100)+
-  ylim(0,50)
-
-
-
+  geom_abline(intercept = 0, slope = 0, color="red")+ ## Theoretical values if EA is mostly ~0 and one is MaxEA (AvgEA-(MaxEA/60) = 0)
+  geom_abline(intercept = 10, slope = 0, color="blue") ## potential threshold value for steady vs burst?
 
 
 Threshold_Data <- Full_Data_Out %>%
   filter(
-    VAR >= 189,
-    VAR <= 191,
+    AvgEA == 10
     
   )
+
+mean(Threshold_Data$VAR) ## <- VAR threshlod = ~190mg^2?
 
 hist(Threshold_Data$VAR,
      xlab = "VAR for AvgEA = 10",
      breaks = 500,
      xlim = c(0,500),
      ylim = c(0,500))
+## mean(VAR) for the given AvgEA value might not be the best indicator 
 
 
-mean(Threshold_Data$AvgEA)
-
-ggplot(Full_Data_Out, aes(x = MaxEA, y = AvgEA, col=BurstScore)) +
-  #facet_wrap(~Biologger)+
-  geom_point(alpha=0.1) +
-  labs(title = "What do we use to determine swimming type ?", x = "Maximum Acceleration", y = "Average Acceleration") +
-  geom_abline(intercept = 0, slope = 1/60, color="red")+
-  geom_abline(intercept = 0, slope = 1, color="red")+
-  #geom_abline(intercept = 10, slope = 0, color="blue")+
-  xlim(0,600)+
-  ylim(0,40)
-#geom_abline(intercept = 10, slope =  1/60, color="blue")
-
-
-ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR)) +
-  geom_point(alpha=0.05) +
-  labs(title = "What do we use to determine swimming type ?", x = "Average Acceleration", y = "Variance of acceleration")+
-  #ylim(0, 450)+
-  #xlim(0,20)
-  #geom_abline(intercept = 10, slope =  1/60, color="blue")
-  
-  library(plotly)
+library(plotly)
 plot_ly(data = Full_Data_Out, x = ~VAR, y = ~MaxEA, z = ~AvgEA, type = "scatter3d", size = 1, mode = "markers")
 
 Clust <- Full_Data_Out[, c(6, 33, 34)]
@@ -238,8 +178,6 @@ ggplot(Full_Data_Out, aes(x = AvgEA, y = VAR, col=Cluster)) +
 #geom_abline(intercept = 10, slope =  1/60, color="blue")
 
 
-
-
 ### Try with 2 clusters
 gmm <- Mclust(Clust_scaled, G = 2)
 summary(gmm)
@@ -276,9 +214,7 @@ anyNA(Full_Data_Out_Cluster)
 any(is.nan(as.matrix(Full_Data_Out_Cluster)))
 any(is.infinite(as.matrix(Full_Data_Out_Cluster)))
 
-str(Full_Data_Out_Cluster$AvgEA)
-str(Full_Data_Out_Cluster$VAR)
-str(Full_Data_Out_Cluster$MaxEA)
+str(Full_Data_Out_Cluster)
 # Initialize total within sum of squares error: wss
 wss <- 0
 
@@ -325,7 +261,7 @@ ggplot(Full_Data_Out_Cluster, aes(x = MaxEA, y = VAR, col=Cluster)) +
 
 summary(gmm)
 
-ggplot(Full_Data_Out, aes(x = MaxEA, y = corr.VAR)) +
+ggplot(Full_Data_Out, aes(x = MaxEA, y = VAR)) +
   geom_point(alpha=0.2) +
   labs(title = "Gaussian Mixture Model: 3 Clusters", x = "", y = "Variance of Acceleration") +
   theme_minimal()+
@@ -340,5 +276,3 @@ summary(model2)
 
 summary(model3)
 plot(model3)
-
-summary(model5)
