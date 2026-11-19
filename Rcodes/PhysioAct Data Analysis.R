@@ -249,15 +249,21 @@ performance(Lengthcheck)
 
 
 ## test if greb, food or activity affects lean mass
-Modellean <- glmmTMB(leanmass ~ activity_Steady*greb1l+food + (1| tank) + (1| fam), #<= BEST MODEL
+Modellean <- glmmTMB(leanmass ~ activity_Steady*greb1l+food + (1|tank) + (1| fam), #<= BEST MODEL (greb1l was included in the model to show on plots, but was not retained in the best model)
                           family= gaussian(),
                           data = ActSGRData)
 
-drop1(Modellean) #need to drop tank for model selection to avoid convergence problems
+drop1(Modellean) #need to drop tank to get AIC for stepwise model selection 
 
-performance(Modellean)
-hist(resid(Modellean))
-qqPlot(resid(Modellean))
+
+Modelleanqr <- simulateResiduals(fittedModel = Modellean, plot = FALSE)
+Modelleanqr$scaledResiduals
+plotQQunif(Modelleanqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
+
+performance(Modellean) #need to drop tank for model performance to get all parameters
 summary(Modellean)
 
 
@@ -302,12 +308,12 @@ fat <- ggplot(
 
 ## Plot lean mass
 lean <- ggplot(
-  data = PhysioActData, 
-  mapping = aes(x = food, y = leanmass , fill=greb1l)
-) +
-  geom_boxplot()+
+  data = ActSGRData, 
+  mapping = aes(x = food , y = leanmass , fill=greb1l)
+) +geom_boxplot()+
   theme_bw(base_size = 16)+
   scale_fill_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
+  scale_color_manual(values = c("gold2", "royalblue"), name = "greb1L", labels = c("Summer", "Winter"))+
   theme(axis.title.x = element_blank(),
         axis.title.y = element_text(size=20, face = "bold", margin = margin(r=15, l=15)),
         axis.text.x = element_text(size=18, margin = margin(b=50)),

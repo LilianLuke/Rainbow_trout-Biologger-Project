@@ -15,6 +15,13 @@ library(mgcv)
 library(gamm4)
 library(lme4)
 library(nlme)
+library(ggeffects)
+library(glmmTMB)
+library(performance)
+library(DHARMa)
+library(mgcv)
+library(tidygam)
+library(hms)
 library(nortest)
 library(car)
 library(plotrix)
@@ -30,7 +37,7 @@ library(ggeffects)
 
 
 source("path_file_lilian.R")
-Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger final data.xlsx")) 
+Full_Data_Clean <- read_xlsx(paste0(path.data, "Biologger final data.xlsx")) ## Import dataset
 
 
 Full_Data_Out <- Full_Data_Clean %>%
@@ -54,7 +61,7 @@ Full_Data_Out <- Full_Data_Clean %>%
 
 
 
-##Add a BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
+##Add the BurstScore column to be able to calculate the frequency of individuals bursting or steady-swimming
 Full_Data_Out <- Full_Data_Out %>%
   mutate(
     BurstScore = as.numeric(if_else(
@@ -83,9 +90,10 @@ Full_Data_Out$Tempgroup <- factor(Full_Data_Out$Tempgroup, levels = c("LowTemp",
 
 ## make sure factors are read correctly
 str(Full_Data_Out)
-str(Full_Data_Out$Biologger)
 
-
+## some of the loggers started measuring at 00:00 instead of 12:00
+## and these first points were usually excluded of the data because of error in the measurements
+## so the first measurement is either at 00:30 or 12:30
 comparefooddata <- Full_Data_Out %>%
   group_by(Biologger) %>%
   mutate(
@@ -98,8 +106,8 @@ comparefooddata <- Full_Data_Out %>%
   ) %>%
   ungroup()
 
-
-middayfooddata <- comparefooddata %>%
+## create a column to tell whether the fish were fed or not during the measurement
+daytimefooddata <- comparefooddata %>%
   mutate(
     time= as.numeric(Time),
     daytime = if_else( 
@@ -115,102 +123,79 @@ middayfooddata <- comparefooddata %>%
     daytime = as.factor(daytime),
     
   )
-
-
-dayfooddataLM <- middayfooddata %>%
+## To see if there is a direct food effect, we can compare activity in the morning 
+## between loggers that started at midnight and those that started at noon. 
+## Indeed, both have the same average food availability, but loggers that started recording at midnight get food in the morning
+## while loggers that started at noon do not receive food in the morning (because their morning will be on the next day, i.e., the fasting day)
+## and measurements occurring during the night, as food was never dropped during night time
+AMfooddataLM <- daytimefooddata %>%
   filter(
-    start_type == "noon",
-    Light=="Day"
-  )%>%
+    daytime == "AM",
+    Light=="Night"
+  )
+
+ggplot(data=AMfooddataLM, aes(y= log(AvgEA), x=food, fill=start_type))+
+  geom_boxplot()+
+  theme_bw(base_size = 16)+
+  theme(axis.title.x = element_text(size=18, face = "bold"),
+        axis.title.y = element_text(size=18, face = "bold"),
+        axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        strip.text   = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 20, face = "italic"),
+        legend.text  = element_text(size = 18,face = "italic")
+  )+
+  labs(y="log(AvgEA)")
+
+## No obvious sign of greater activity when fish have food vs when they do not.
+
+
+FastingLM <- glmmTMB(log(AvgEA) ~ start_type*food + (1|Biologger),
+                   data = AMfooddataLM)
+
+
+hist(resid(FastingLM))
+qqPlot(resid(FastingLM))
+Fastingqr <- simulateResiduals(fittedModel = FastingLM, plot = FALSE)
+Fastingqr$scaledResiduals
+plotQQunif(Fastingqr, 
+           testUniformity = TRUE, 
+           testOutliers = TRUE, 
+           testDispersion = TRUE)
+
+summary(FastingLM)
+
+predict.FastingLM <- ggpredict(FastingLM, terms = c("food", "start_type"), ci.lvl = 0.95, bias_correction = TRUE)
+plot(predict.FastingLM)
+
+## Even though no statistical significance was reached,
+## It seems like there is a bigger difference in the ad libitum fed group, 
+## which makes no sense since food availability is the same on both mornings...
+
+
+## Since we found date affects activity quite a lot, maybe try a GAMM including date 
+## to try and see if there are more subtle patterns?
+
+AMfooddataGAMM <- daytimefooddata %>% ## need to convert Date to numeric for Gamm
   mutate(
     Date=as.numeric(Date)
   )
 
 
-nightfooddataLM <- middayfooddata %>%
-  filter(
-    start_type == "midnight"
-  )%>%
-  mutate(
-    Date=as.numeric(Date)
-  )
+Fasting <- bam(AvgEA ~ s(Date, k=20) + start_type*food+ s(tank, bs="re")+ s(Biologger, bs="re") + s(fam, bs="re"),
+               family = Gamma(link = "log"),
+               data = AMfooddataGAMM)
 
-
-
-Fasting <- lme(log(AvgEA) ~ Date*daytime*food,
-                     method="ML",
-                     random=list(Biologger=~1, fam=~1, tank=~1),
-                     data = middayfooddataLM)
-hist(resid(Fasting))
-qqPlot(resid(Fasting))
+performance(Fasting)
 summary(Fasting)
-predict.Fasting <- ggpredict(Fasting, terms = c("Date", "daytime", "food", "Light"), ci.lvl = 0.95, bias_correction = TRUE)
-plot(predict.Fasting)
 
-Fasting <- bam(AvgEA ~ s(Date) + daytime*food+ s(tank, bs="re")+ s(Biologger, bs="re") + s(fam, bs="re"),
-               family = Gamma(link = "log"),
-               data = dayfooddataLM)
-
-Fasting <- bam(AvgEA ~ s(Date) + daytime*food*Light+ s(tank, bs="re")+ s(Biologger, bs="re") + s(fam, bs="re"),
-               family = Gamma(link = "log"),
-               data = nightfooddataLM)
-
-
-EMM <- emmeans(Fasting, ~ daytime*food*start_type, data=nightfooddataLM) 
+EMM <- emmeans(Fasting, ~ start_type*food, data=AMfooddataGAMM) 
 EMM_resp <- regrid(EMM)
 pairs(EMM_resp)
 
-### The model shows a general effect of the food treatment, with activity being lower in the low food group 
-### compared to the high food group on the afternoon of the second feeding day
+predict.Fasting <- ggpredict(Fasting, terms = c("Date", "start_type", "food" ), ci.lvl = 0.95, bias_correction = TRUE)
+plot(predict.Fasting)
 
-### It also shows a significant immediate effect of absence of food, 
-### with activity being significantly lower on the morning of the fasting day
-### compared to the afternoon of the feeding day
-
-
-### Note: the low-fed fish are already less active in the night before the fasting day,
-### which suggests that they may have learned the feeding schedule.
-
-
-middayfooddatanoon <- middayfooddata %>%
-  filter(
-    start_type == "midnight",
-    Light == "Day"
-  )
-
-ggplot(
-  data = middayfooddatanoon, 
-  mapping = aes(x = Date, y = BurstScore, color=food),
-) +
-  facet_wrap(~daytime)+
-  geom_point()+
-  geom_smooth()
-
-
-ggplot(
-  data = middayfooddatanoon, 
-  mapping = aes(x = Date, y = BurstScore, color=daytime),
-) +
-  facet_wrap(~food)+
-  geom_point(alpha=.05)+
-  geom_smooth(method=lm)
-
-
-
-ggplot(
-  data = FoodBurst, 
-  mapping = aes(x = Tempgroup, y = mean_AvgEA, fill=start_type),
-) +
-  facet_wrap(~daytime+food)+
-  geom_boxplot()
-
-ggplot(
-  data = middayfooddata, 
-  mapping = aes(x = hms::hms(Time), y = BurstScore),
-) +
-  facet_wrap(~start_type+food)+
-  geom_point(alpha=.01)+
-  geom_smooth()
-
-
-
+## Again, some sort of difference in the high-food group that is not relevant
+## No sign of different activity between morning with food vs morning without food.
+## Conclusion: no direct effect of food availability on general activity

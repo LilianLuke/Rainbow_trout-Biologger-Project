@@ -103,7 +103,7 @@ GAMMAvg <- bam(AvgEA ~ food*greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, b
 gam.check(GAMMAvg)
 concurvity(GAMMAvg, full=FALSE)
 performance(GAMMAvg)
-### => model performance are okay-ish, the plots don't look that great but I guess accelerometery data is a bit tricky 
+### => model performances are okay-ish, the plots don't look that great but I guess accelerometery data is a bit tricky 
 ## Note : => it is not necessary to nest tank/Biologger if all Biologgers are differents
 ### Necessary only if fish in different tanks have the same ID, to tell the model, e.g., that fish 1 in tank 1 is not the same as fish 1 in tank 2
 ### Nesting tank in food doesn't change anything either, so I guess it can stay this way.
