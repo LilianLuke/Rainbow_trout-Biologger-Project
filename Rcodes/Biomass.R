@@ -35,7 +35,7 @@ Nov_measurements <- read_xlsx(paste0(path_meas, "November2024_Trout_Lammi.xlsx")
     Regime= as.factor(Regime)
   )%>%
   select(-Smoltification)%>%
-  filter(Weight<10)
+  filter(Weight > 10)
 
 str(Nov_measurements)
 
@@ -79,7 +79,7 @@ May_surements <- map_dfr(Bind_May, function(fpath) {
     )%>%
   select(PIT, Length, Weight, Tank, Regime)%>% 
   na.omit()%>%
-  filter(Weight<10)
+  filter(Weight > 10)
 
 sum(duplicated(May_surements$PIT)) ## check if any duplicate fish
 May_surements %>% ## check if duplicates are actual ID or typos
@@ -104,4 +104,22 @@ MayBiomass <- May_surements%>%  ## Create a summary table per tank/food treatmen
   )
 
 print(MayBiomass)
+
+
+## look for outliers on plots?
+
+ggplot(data=Nov_measurements, aes(y=log(Weight), x=log(Length)))+
+  facet_wrap(~Regime)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  theme_bw(base_size = 16)
+## no obvious outliers
+
+ggplot(data=May_surements, aes(y=log(Weight), x=log(Length)))+
+  facet_wrap(~Regime)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  theme_bw(base_size = 16)
+## no obvious outliers, maybe the one >1kg fish but nothing really obvious and I doubt that one fish would change much...
+
 
