@@ -93,7 +93,7 @@ contrasts(Full_Data_GAMM$food_greb) <- "contr.treatment"
 ## 2) https://stats.stackexchange.com/questions/633116/gamm-using-mgcv-in-r-by-participant-random-effects-for-categorical-variables
 ## 3) https://drmowinckels.io/blog/2018/gamm-random-effects/#:~:text=Explore%20the%20use%20of%20Generalized%20Additive%20Mixed%20Models,walks%20through%20a%20detailed%20example%20with%20simulated%20data.
 
-## k was set to 20 because there are ~20 measurements periods (20*24hrs)
+## k was set to 20 because there are ~20 recording periods (20*24hrs)
 
 
 GAMMAvg <- bam(AvgEA ~ food*greb1l*Swimstyle + Light + s(Date, k=20) + s(Date, by = food_greb, k=20) + s(Biologger, bs = "re") + s(food,tank, bs="re") + s(fam, bs="re"),

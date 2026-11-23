@@ -229,8 +229,7 @@ ggplot(data=ActSGRData, aes(y=SGRMass, x=activity_Steady))+
         strip.text   = element_text(size = 20, face = "bold"),
         legend.title = element_text(size = 16, face = "italic"),
         legend.text  = element_text(size = 14,face = "italic"))+
-  labs(x="Individual average steady swimming AvgEA (mg)", y="Specific growth rate (%/day)")+
-  xlim(0,8)
+  labs(x="Individual average steady swimming AvgEA (mg)", y="Specific growth rate (%/day)")
         
 
 ### Quickly check that there is no effect of initial fish size on individual mean AvgEA values 
@@ -323,7 +322,7 @@ lean <- ggplot(
         legend.position = "none",
         
   )+
-  labs(x="Food treatment", y="Lean mass in May (g)")+
+  labs(x="Food treatment", y="Lean mass (g)")+
   ylim(0, 600)
 
 ## Show both plots on the same board
