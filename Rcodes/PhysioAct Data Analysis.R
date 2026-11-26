@@ -248,7 +248,7 @@ performance(Lengthcheck)
 
 
 ## test if greb, food or activity affects lean mass
-Modellean <- glmmTMB(leanmass ~ activity_Steady*greb1l+food + (1|tank) + (1| fam), #<= BEST MODEL (greb1l was included in the model to show on plots, but was not retained in the best model)
+Modellean <- glmmTMB(leanmass ~ greb1l+food + (1| fam), #<= BEST MODEL 
                           family= gaussian(),
                           data = ActSGRData)
 
@@ -267,7 +267,7 @@ summary(Modellean)
 
 
 ## fat mass correlates with body size (lean mass) in a log/log relationship.
-ModelFat <- glmmTMB(log(fatmass)  ~  log(leanmass) + greb1l + food + (1| tank) + (1| fam), #<= BEST MODEL (greb1l was included in the model to show on plots, but was not retained in the best model)
+ModelFat <- glmmTMB(log(fatmass)  ~  log(leanmass) + greb1l + food + (1| tank), #<= BEST MODEL (greb1l was included in the model to show on plots, but was not retained in the best model)
                           family= gaussian(),
                           data = ActSGRData)
 

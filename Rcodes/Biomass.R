@@ -93,7 +93,7 @@ setwd(work_direc)
 
 str(May_surements)
 
-with(May_surements, table(Regime))
+with(May_surements, table(Regime, Tank))
 
 MayBiomass <- May_surements%>%  ## Create a summary table per tank/food treatment
   group_by(Regime) %>%
@@ -104,7 +104,6 @@ MayBiomass <- May_surements%>%  ## Create a summary table per tank/food treatmen
   )
 
 print(MayBiomass)
-
 
 ## look for outliers on plots?
 

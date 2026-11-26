@@ -106,6 +106,10 @@ Full_Temp <- Temp_Tank22 %>%
   relocate(Tank)%>%
   relocate(Date_Time, .after = last_col())
 
+
+write_xlsx(Full_Temp, paste0(path.temp, "/Lammi2025_Temperatures.xlsx"))
+
+
 Full_Temp$Tank <- dplyr::recode(Full_Temp$Tank, "23" = "2",  "25" = "3", "22" = "4",  "24" = "5",  "26" = "6") ## recode tank names for clarity
 
 Full_Temp$Tank <- factor(Full_Temp$Tank, levels = c("2", "3", "4", "5", "6")) ## rearrange them in the correct order

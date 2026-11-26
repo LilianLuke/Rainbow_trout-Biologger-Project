@@ -27,6 +27,7 @@ library(emmeans)
 library(tools)
 library(ggeffects)
 
+source("path_file_lilian.R")
 
 ##read the file from the Xray machine with all the info  
 

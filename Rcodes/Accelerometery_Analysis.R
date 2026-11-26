@@ -114,7 +114,7 @@ AIC(GAMMAvg)
 pairs(emmeans(GAMMAvg, ~ greb1l | food * Swimstyle, type = "response"), adjust="sidak")
 # the "adjust" argument does not work, so I computed p-values adjustment manually, with sidak method: p-adj = 1-(1-p)^n (for n=4 tests)
 
-
+with(Full_Data_GAMM, table(Swimstyle, greb1l, food))
 
 ## The low-food smooth are both different from the reference (here, high food + allele 1) but not high-food allele 2
 ## and there is a >1 difference in edf between allele 1 and 2 in low-food, which I think means they differ (see source 1), p.24)

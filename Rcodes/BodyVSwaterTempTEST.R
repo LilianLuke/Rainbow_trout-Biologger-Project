@@ -4,6 +4,7 @@
 
 source("path_file_lilian.R")
 
+
 Temp_Tank22 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_22.xlsx")) 
 Temp_Tank23 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_23.xlsx")) 
 Temp_Tank24 <- read_xlsx(paste0(path.temp, "lammi2025October_Tank_24.xlsx")) 
@@ -211,7 +212,7 @@ plotQQunif(Tempqr,
 
 hist(resid(Temp), breaks = 500)
 
-summary(Temp2) # <= Is that a ciracadian endogenous thermogenesis patter that I see here?
+summary(Temp2) # <= Is that a ciracadian endogenous thermogenesis pattern that I see here?
 
 Full_Data_Temp$food <- dplyr::recode(Full_Data_Temp$food, "high-food" = "Ad Libitum",  "low-food" = "Restricted")
 Full_Data_Temp$greb1l <- dplyr::recode(Full_Data_Temp$greb1l, "Allele 1" = "Summer",  "Allele 2" = "Winter")
